@@ -41,6 +41,8 @@ jobs:
           VITE_AI_API_URL: ${{ secrets.VITE_AI_API_URL }}
           VITE_ADMIN_PASSWORD: ${{ secrets.VITE_ADMIN_PASSWORD }}
           VITE_STORE_ADMIN_PASSWORD: ${{ secrets.VITE_STORE_ADMIN_PASSWORD }}
+          VITE_SYSTEM_ADMIN_GOOGLE_EMAILS: ${{ secrets.VITE_SYSTEM_ADMIN_GOOGLE_EMAILS }}
+          VITE_STORE_ADMIN_GOOGLE_EMAILS: ${{ secrets.VITE_STORE_ADMIN_GOOGLE_EMAILS }}
         run: npm run build
 
       - name: SPA fallback (rotas diretas no GitHub Pages)

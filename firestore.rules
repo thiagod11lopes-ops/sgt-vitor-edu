@@ -2,18 +2,52 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isSystemAdmin() {
+    function adminConfig() {
+      return exists(/databases/$(database)/documents/config/admins)
+        ? get(/databases/$(database)/documents/config/admins).data
+        : null;
+    }
+
+    function isSystemGoogleAdmin() {
       return request.auth != null
-        && request.auth.token.email == 'system-admin@sgt-vitor-edu.app';
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && adminConfig() != null
+        && request.auth.token.email in adminConfig().systemGoogleEmails;
+    }
+
+    function isStoreGoogleAdmin() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && adminConfig() != null
+        && request.auth.token.email in adminConfig().storeGoogleEmails;
+    }
+
+    function isSystemAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == 'system-admin@sgt-vitor-edu.app'
+        || isSystemGoogleAdmin()
+      );
     }
 
     function isStoreAdmin() {
-      return request.auth != null
-        && request.auth.token.email == 'store-admin@sgt-vitor-edu.app';
+      return request.auth != null && (
+        request.auth.token.email == 'store-admin@sgt-vitor-edu.app'
+        || isStoreGoogleAdmin()
+      );
     }
 
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
+    }
+
+    match /config/admins {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && (
+          request.auth.token.email in request.resource.data.systemGoogleEmails
+          || request.auth.token.email in request.resource.data.storeGoogleEmails
+        );
     }
 
     match /users/{userId} {

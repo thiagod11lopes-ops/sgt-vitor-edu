@@ -2,9 +2,16 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from 'firebase/auth'
 import { adminAuth, STORE_ADMIN_EMAIL, SYSTEM_ADMIN_EMAIL } from './adminApp'
 import { isConfigured } from './config'
+import {
+  isEmailAllowedForRole,
+  loadAdminConfig,
+  registerGoogleAdminEmail,
+} from './adminConfig'
 
 export type AdminRole = 'system' | 'store'
 
@@ -12,6 +19,13 @@ export interface AdminAuthResult {
   passwordOk: boolean
   firebaseOk: boolean
   errorCode?: string
+}
+
+export interface AdminGoogleAuthResult {
+  ok: boolean
+  firebaseOk: boolean
+  errorCode?: string
+  errorMessage?: string
 }
 
 function expectedPassword(role: AdminRole): string {
@@ -84,16 +98,74 @@ export async function ensureAdminFirebaseAuth(
   return signInOrCreateAdmin(email, validPassword)
 }
 
+export async function signInAdminWithGoogle(role: AdminRole): Promise<AdminGoogleAuthResult> {
+  if (!isConfigured || !adminAuth) {
+    return {
+      ok: false,
+      firebaseOk: false,
+      errorMessage: 'Firebase não configurado neste ambiente.',
+    }
+  }
+
+  try {
+    const provider = new GoogleAuthProvider()
+    provider.setCustomParameters({ prompt: 'select_account' })
+    const cred = await signInWithPopup(adminAuth, provider)
+    const email = cred.user.email
+
+    if (!email) {
+      await signOut(adminAuth)
+      return {
+        ok: false,
+        firebaseOk: false,
+        errorCode: 'auth/no-email',
+        errorMessage: 'Conta Google sem e-mail. Use outra conta.',
+      }
+    }
+
+    const config = await loadAdminConfig()
+    if (!isEmailAllowedForRole(role, email, config)) {
+      await signOut(adminAuth)
+      return {
+        ok: false,
+        firebaseOk: false,
+        errorCode: 'auth/unauthorized-admin',
+        errorMessage: 'Este Google não está autorizado para este painel.',
+      }
+    }
+
+    await registerGoogleAdminEmail(role, email)
+    return { ok: true, firebaseOk: true }
+  } catch (error: unknown) {
+    const code = firebaseErrorCode(error)
+    if (code === 'auth/popup-closed-by-user') {
+      return { ok: false, firebaseOk: false, errorCode: code }
+    }
+    return {
+      ok: false,
+      firebaseOk: false,
+      errorCode: code,
+      errorMessage: adminFirebaseErrorMessage(code) ?? 'Falha ao entrar com Google.',
+    }
+  }
+}
+
 export function adminFirebaseErrorMessage(code?: string): string | null {
   if (!code) return null
   if (code === 'auth/operation-not-allowed') {
-    return 'Ative "E-mail/senha" em Firebase → Authentication → Sign-in method.'
+    return 'Ative "Google" e "E-mail/senha" em Firebase → Authentication → Sign-in method.'
+  }
+  if (code === 'auth/unauthorized-admin') {
+    return 'Este e-mail Google não está autorizado para este painel.'
   }
   if (code === 'auth/wrong-password-in-firebase') {
     return 'Senha correta no app, mas a conta Firebase está diferente. Exclua o usuário admin no Firebase Console e entre de novo.'
   }
   if (code === 'auth/too-many-requests') {
     return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'
+  }
+  if (code === 'auth/popup-blocked') {
+    return 'Pop-up bloqueado. Permita pop-ups para este site e tente novamente.'
   }
   return `Firebase: ${code.replace('auth/', '')}`
 }
@@ -102,8 +174,14 @@ export async function signOutAdminFirebase() {
   if (adminAuth) await signOut(adminAuth)
 }
 
-export function isAdminFirebaseReady(role: AdminRole): boolean {
-  if (!isConfigured || !adminAuth) return false
-  const email = role === 'system' ? SYSTEM_ADMIN_EMAIL : STORE_ADMIN_EMAIL
-  return adminAuth.currentUser?.email === email
+export async function isAdminFirebaseReady(role: AdminRole): Promise<boolean> {
+  if (!isConfigured || !adminAuth?.currentUser?.email) return false
+
+  const email = adminAuth.currentUser.email.toLowerCase()
+  if (role === 'system' && email === SYSTEM_ADMIN_EMAIL) return true
+  if (role === 'store' && email === STORE_ADMIN_EMAIL) return true
+
+  const config = await loadAdminConfig()
+  const list = role === 'system' ? config.systemGoogleEmails : config.storeGoogleEmails
+  return list.includes(email)
 }

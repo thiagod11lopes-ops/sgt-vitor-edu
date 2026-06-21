@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Shield, LogIn, ArrowLeft } from 'lucide-react'
-import { loginAdmin } from '@/features/admin/adminAuthService'
+import { loginAdmin, loginAdminWithGoogle } from '@/features/admin/adminAuthService'
 import { Button } from '@/components/ui/Button'
 import { AdminShell } from '@/components/admin/AdminShell'
+import { AdminGoogleLoginButton } from '@/components/admin/AdminGoogleLoginButton'
 
 export function AdminLoginPage() {
   const [password, setPassword] = useState('')
@@ -50,12 +51,23 @@ export function AdminLoginPage() {
             {error && <p className="text-xs text-red-400">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
               <LogIn size={16} />
-              Entrar no painel
+              Entrar com senha
             </Button>
           </form>
 
+          <AdminGoogleLoginButton
+            disabled={loading}
+            onLogin={async () => {
+              const result = await loginAdminWithGoogle()
+              if (result.ok) navigate('/admin', { replace: true })
+              return { ok: result.ok, error: result.error }
+            }}
+          />
+
           <p className="text-[10px] text-text-muted text-center mt-4">
-            Demo: senha padrão <strong className="text-text-secondary">sgtvitor2024</strong>
+            Senha padrão: <strong className="text-text-secondary">sgtvitor2024</strong>
+            {' · '}
+            ou use o Google autorizado
           </p>
 
           <Link

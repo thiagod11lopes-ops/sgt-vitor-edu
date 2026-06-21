@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { ShoppingBag, LogIn, ArrowLeft } from 'lucide-react'
-import { loginStoreAdmin } from '@/features/store/storeAdminAuthService'
+import { loginStoreAdmin, loginStoreAdminWithGoogle } from '@/features/store/storeAdminAuthService'
 import { Button } from '@/components/ui/Button'
 import { AdminShell } from '@/components/admin/AdminShell'
+import { AdminGoogleLoginButton } from '@/components/admin/AdminGoogleLoginButton'
 
 export function StoreAdminLoginPage() {
   const [password, setPassword] = useState('')
@@ -50,12 +51,23 @@ export function StoreAdminLoginPage() {
             {error && <p className="text-xs text-red-400">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
               <LogIn size={16} />
-              Entrar
+              Entrar com senha
             </Button>
           </form>
 
+          <AdminGoogleLoginButton
+            disabled={loading}
+            onLogin={async () => {
+              const result = await loginStoreAdminWithGoogle()
+              if (result.ok) navigate('/loja-admin', { replace: true })
+              return { ok: result.ok, error: result.error }
+            }}
+          />
+
           <p className="text-[10px] text-text-muted text-center mt-4">
-            Demo: senha padrão <strong className="text-text-secondary">lojastgt2024</strong>
+            Senha padrão: <strong className="text-text-secondary">lojastgt2024</strong>
+            {' · '}
+            ou use o Google autorizado
           </p>
 
           <Link

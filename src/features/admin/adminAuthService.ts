@@ -1,25 +1,46 @@
 import {
   ensureAdminFirebaseAuth,
+  signInAdminWithGoogle,
   adminFirebaseErrorMessage,
   signOutAdminFirebase,
 } from '@/services/firebase/adminFirebaseAuth'
+import { isConfigured } from '@/services/firebase/config'
 
 const ADMIN_SESSION_KEY = 'sgt-vitor-admin-session'
 const ADMIN_FIREBASE_WARN_KEY = 'sgt-vitor-admin-firebase-warn'
 
-export async function loginAdmin(password: string): Promise<{ ok: boolean; warning?: string }> {
-  const result = await ensureAdminFirebaseAuth('system', password)
-  if (!result.passwordOk) return { ok: false }
-
+function completeLogin(result: { firebaseOk: boolean; errorCode?: string }) {
   localStorage.setItem(ADMIN_SESSION_KEY, '1')
   if (result.firebaseOk) {
     localStorage.removeItem(ADMIN_FIREBASE_WARN_KEY)
-    return { ok: true }
+    return { ok: true as const }
   }
-
   const warning = adminFirebaseErrorMessage(result.errorCode) ?? undefined
   if (warning) localStorage.setItem(ADMIN_FIREBASE_WARN_KEY, warning)
-  return { ok: true, warning }
+  return { ok: true as const, warning }
+}
+
+export async function loginAdmin(password: string): Promise<{ ok: boolean; warning?: string }> {
+  const result = await ensureAdminFirebaseAuth('system', password)
+  if (!result.passwordOk) return { ok: false }
+  return completeLogin(result)
+}
+
+export async function loginAdminWithGoogle(): Promise<{
+  ok: boolean
+  warning?: string
+  error?: string
+}> {
+  if (!isConfigured) {
+    return { ok: false, error: 'Firebase não configurado.' }
+  }
+
+  const result = await signInAdminWithGoogle('system')
+  if (!result.ok) {
+    return { ok: false, error: result.errorMessage ?? 'Não foi possível entrar com Google.' }
+  }
+
+  return completeLogin(result)
 }
 
 export function getAdminFirebaseWarning(): string | null {
