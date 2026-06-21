@@ -1,15 +1,34 @@
-import { ensureAdminFirebaseAuth, signOutAdminFirebase } from '@/services/firebase/adminFirebaseAuth'
+import {
+  ensureAdminFirebaseAuth,
+  adminFirebaseErrorMessage,
+  signOutAdminFirebase,
+} from '@/services/firebase/adminFirebaseAuth'
 
 const ADMIN_SESSION_KEY = 'sgt-vitor-admin-session'
+const ADMIN_FIREBASE_WARN_KEY = 'sgt-vitor-admin-firebase-warn'
 
-export async function loginAdmin(password: string): Promise<boolean> {
-  const ok = await ensureAdminFirebaseAuth('system', password)
-  if (ok) localStorage.setItem(ADMIN_SESSION_KEY, '1')
-  return ok
+export async function loginAdmin(password: string): Promise<{ ok: boolean; warning?: string }> {
+  const result = await ensureAdminFirebaseAuth('system', password)
+  if (!result.passwordOk) return { ok: false }
+
+  localStorage.setItem(ADMIN_SESSION_KEY, '1')
+  if (result.firebaseOk) {
+    localStorage.removeItem(ADMIN_FIREBASE_WARN_KEY)
+    return { ok: true }
+  }
+
+  const warning = adminFirebaseErrorMessage(result.errorCode) ?? undefined
+  if (warning) localStorage.setItem(ADMIN_FIREBASE_WARN_KEY, warning)
+  return { ok: true, warning }
+}
+
+export function getAdminFirebaseWarning(): string | null {
+  return localStorage.getItem(ADMIN_FIREBASE_WARN_KEY)
 }
 
 export async function logoutAdmin() {
   localStorage.removeItem(ADMIN_SESSION_KEY)
+  localStorage.removeItem(ADMIN_FIREBASE_WARN_KEY)
   await signOutAdminFirebase()
 }
 

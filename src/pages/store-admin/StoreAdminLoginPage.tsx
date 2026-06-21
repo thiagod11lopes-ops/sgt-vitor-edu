@@ -16,17 +16,13 @@ export function StoreAdminLoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    try {
-      if (await loginStoreAdmin(password)) {
-        navigate('/loja-admin', { replace: true })
-      } else {
-        setError('Senha incorreta. Tente novamente.')
-      }
-    } catch {
-      setError('Não foi possível autenticar no Firebase. Verifique Authentication no console.')
-    } finally {
-      setLoading(false)
+    const result = await loginStoreAdmin(password)
+    if (result.ok) {
+      navigate('/loja-admin', { replace: true })
+    } else {
+      setError('Senha incorreta. Use lojastgt2024 (padrão) ou a senha definida no deploy.')
     }
+    setLoading(false)
   }
 
   return (

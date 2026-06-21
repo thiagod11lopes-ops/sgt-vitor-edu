@@ -1,6 +1,6 @@
 import { NavLink, Outlet, Link } from 'react-router-dom'
 import { Package, ClipboardList, ArrowLeft, LogOut, ShoppingBag } from 'lucide-react'
-import { logoutStoreAdmin } from '@/features/store/storeAdminAuthService'
+import { logoutStoreAdmin, getStoreAdminFirebaseWarning } from '@/features/store/storeAdminAuthService'
 import { cn } from '@/lib/utils'
 
 const links = [
@@ -9,6 +9,8 @@ const links = [
 ]
 
 export function StoreAdminLayout() {
+  const firebaseWarning = getStoreAdminFirebaseWarning()
+
   const handleLogout = () => {
     void logoutStoreAdmin().finally(() => {
       window.location.href = '/loja-admin/login'
@@ -69,6 +71,11 @@ export function StoreAdminLayout() {
         </aside>
 
         <main className="flex-1 overflow-y-auto hide-scrollbar safe-top safe-bottom">
+          {firebaseWarning && (
+            <p className="mx-4 mt-4 mb-0 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+              {firebaseWarning}
+            </p>
+          )}
           <Outlet />
         </main>
       </div>

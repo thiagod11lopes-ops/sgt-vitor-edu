@@ -16,17 +16,13 @@ export function AdminLoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    try {
-      if (await loginAdmin(password)) {
-        navigate('/admin', { replace: true })
-      } else {
-        setError('Senha incorreta. Tente novamente.')
-      }
-    } catch {
-      setError('Não foi possível autenticar no Firebase. Verifique Authentication no console.')
-    } finally {
-      setLoading(false)
+    const result = await loginAdmin(password)
+    if (result.ok) {
+      navigate('/admin', { replace: true })
+    } else {
+      setError('Senha incorreta. Use sgtvitor2024 (padrão) ou a senha definida no deploy.')
     }
+    setLoading(false)
   }
 
   return (

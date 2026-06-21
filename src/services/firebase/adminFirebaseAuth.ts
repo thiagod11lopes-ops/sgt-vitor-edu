@@ -6,38 +6,96 @@ import {
 import { adminAuth, STORE_ADMIN_EMAIL, SYSTEM_ADMIN_EMAIL } from './adminApp'
 import { isConfigured } from './config'
 
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'sgtvitor2024'
-const STORE_ADMIN_PASSWORD = import.meta.env.VITE_STORE_ADMIN_PASSWORD || 'lojastgt2024'
-
 export type AdminRole = 'system' | 'store'
 
-function credentialsFor(role: AdminRole) {
-  return role === 'system'
-    ? { email: SYSTEM_ADMIN_EMAIL, password: ADMIN_PASSWORD }
-    : { email: STORE_ADMIN_EMAIL, password: STORE_ADMIN_PASSWORD }
+export interface AdminAuthResult {
+  passwordOk: boolean
+  firebaseOk: boolean
+  errorCode?: string
 }
 
-export async function ensureAdminFirebaseAuth(role: AdminRole, password: string): Promise<boolean> {
-  const { email, password: expectedPassword } = credentialsFor(role)
-  if (password !== expectedPassword) return false
+function expectedPassword(role: AdminRole): string {
+  const envValue =
+    role === 'system'
+      ? import.meta.env.VITE_ADMIN_PASSWORD
+      : import.meta.env.VITE_STORE_ADMIN_PASSWORD
+  const fallback = role === 'system' ? 'sgtvitor2024' : 'lojastgt2024'
+  if (typeof envValue === 'string' && envValue.trim().length > 0) {
+    return envValue.trim()
+  }
+  return fallback
+}
 
-  if (!isConfigured || !adminAuth) return true
+function credentialsFor(role: AdminRole) {
+  const password = expectedPassword(role)
+  return {
+    email: role === 'system' ? SYSTEM_ADMIN_EMAIL : STORE_ADMIN_EMAIL,
+    password,
+  }
+}
+
+function firebaseErrorCode(error: unknown): string | undefined {
+  return (error as { code?: string }).code
+}
+
+async function signInOrCreateAdmin(email: string, password: string): Promise<AdminAuthResult> {
+  if (!isConfigured || !adminAuth) {
+    return { passwordOk: true, firebaseOk: false }
+  }
 
   try {
     await signInWithEmailAndPassword(adminAuth, email, password)
-    return true
-  } catch (error: unknown) {
-    const code = (error as { code?: string }).code
-    if (code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
+    return { passwordOk: true, firebaseOk: true }
+  } catch (signInError: unknown) {
+    const signInCode = firebaseErrorCode(signInError)
+
+    if (
+      signInCode === 'auth/user-not-found' ||
+      signInCode === 'auth/invalid-credential' ||
+      signInCode === 'auth/invalid-login-credentials'
+    ) {
       try {
         await createUserWithEmailAndPassword(adminAuth, email, password)
-        return true
-      } catch {
-        return false
+        return { passwordOk: true, firebaseOk: true }
+      } catch (createError: unknown) {
+        const createCode = firebaseErrorCode(createError)
+        if (createCode === 'auth/email-already-in-use') {
+          return { passwordOk: true, firebaseOk: false, errorCode: 'auth/wrong-password-in-firebase' }
+        }
+        return { passwordOk: true, firebaseOk: false, errorCode: createCode ?? signInCode }
       }
     }
-    return false
+
+    return { passwordOk: true, firebaseOk: false, errorCode: signInCode }
   }
+}
+
+export async function ensureAdminFirebaseAuth(
+  role: AdminRole,
+  password: string,
+): Promise<AdminAuthResult> {
+  const trimmed = password.trim()
+  const { email, password: validPassword } = credentialsFor(role)
+
+  if (trimmed !== validPassword) {
+    return { passwordOk: false, firebaseOk: false }
+  }
+
+  return signInOrCreateAdmin(email, validPassword)
+}
+
+export function adminFirebaseErrorMessage(code?: string): string | null {
+  if (!code) return null
+  if (code === 'auth/operation-not-allowed') {
+    return 'Ative "E-mail/senha" em Firebase → Authentication → Sign-in method.'
+  }
+  if (code === 'auth/wrong-password-in-firebase') {
+    return 'Senha correta no app, mas a conta Firebase está diferente. Exclua o usuário admin no Firebase Console e entre de novo.'
+  }
+  if (code === 'auth/too-many-requests') {
+    return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'
+  }
+  return `Firebase: ${code.replace('auth/', '')}`
 }
 
 export async function signOutAdminFirebase() {
@@ -45,7 +103,7 @@ export async function signOutAdminFirebase() {
 }
 
 export function isAdminFirebaseReady(role: AdminRole): boolean {
-  if (!isConfigured || !adminAuth) return true
+  if (!isConfigured || !adminAuth) return false
   const email = role === 'system' ? SYSTEM_ADMIN_EMAIL : STORE_ADMIN_EMAIL
   return adminAuth.currentUser?.email === email
 }

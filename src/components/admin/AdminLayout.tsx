@@ -8,7 +8,7 @@ import {
   Shield,
   LogOut,
 } from 'lucide-react'
-import { logoutAdmin } from '@/features/admin/adminAuthService'
+import { logoutAdmin, getAdminFirebaseWarning } from '@/features/admin/adminAuthService'
 import { cn } from '@/lib/utils'
 
 const links = [
@@ -19,6 +19,8 @@ const links = [
 ]
 
 export function AdminLayout() {
+  const firebaseWarning = getAdminFirebaseWarning()
+
   const handleLogout = () => {
     void logoutAdmin().finally(() => {
       window.location.href = '/admin/login'
@@ -76,6 +78,11 @@ export function AdminLayout() {
       </aside>
 
       <main className="flex-1 overflow-y-auto hide-scrollbar safe-top safe-bottom">
+        {firebaseWarning && (
+          <p className="mx-4 mt-4 mb-0 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+            {firebaseWarning}
+          </p>
+        )}
         <Outlet />
       </main>
     </div>
