@@ -1,0 +1,59 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Esquema compartilhado — ver src/services/firebase/collections.ts
+    // Ajuste regras antes de abrir ao público.
+
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      match /messages/{messageId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /quizResults/{resultId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /history/{entryId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    match /videos/{videoId} {
+      allow read: if true;
+      allow write: if false; // admin via Cloud Functions ou custom claims
+    }
+
+    match /documents/{documentId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /storeProducts/{productId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /storeOrders/{orderId} {
+      allow read, create: if request.auth != null;
+      allow update, delete: if false;
+    }
+
+    match /consultingRequests/{requestId} {
+      allow read, create: if request.auth != null;
+      allow update, delete: if false;
+    }
+
+    match /analyticsEvents/{eventId} {
+      allow create: if true;
+      allow read, update, delete: if false;
+    }
+
+    match /pdfAssets/{assetId} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
