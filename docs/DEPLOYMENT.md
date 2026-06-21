@@ -26,6 +26,9 @@ Todas as rotas ficam no **mesmo endereço** (como no dev local).
 
 ## 1. Ativar GitHub Pages
 
+> **Repositório privado:** no plano gratuito do GitHub, **Pages não funciona em repos privados**.  
+> Opções: tornar o repositório **público** (`Settings → General → Danger zone → Change visibility`) ou usar plano pago (Pro/Team).
+
 No repositório GitHub → **Settings → Pages**:
 
 - **Source:** GitHub Actions
