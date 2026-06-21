@@ -64,9 +64,9 @@ export function StorePage() {
     setShowBuyerForm(true)
   }
 
-  const handleBuyerSubmit = (buyer: StoreBuyerData) => {
+  const handleBuyerSubmit = async (buyer: StoreBuyerData) => {
     if (!selected) return
-    createOrder(uid, userName, userEmail, selected, buyer)
+    await createOrder(uid, userName, userEmail, selected, buyer)
     setShowBuyerForm(false)
     refresh()
     setShowOrders(true)

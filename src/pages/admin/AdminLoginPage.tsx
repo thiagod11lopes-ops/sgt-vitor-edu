@@ -10,12 +10,22 @@ export function AdminLoginPage() {
   const [error, setError] = useState('')
   const navigate = useNavigate()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (loginAdmin(password)) {
-      navigate('/admin', { replace: true })
-    } else {
-      setError('Senha incorreta. Tente novamente.')
+    setLoading(true)
+    setError('')
+    try {
+      if (await loginAdmin(password)) {
+        navigate('/admin', { replace: true })
+      } else {
+        setError('Senha incorreta. Tente novamente.')
+      }
+    } catch {
+      setError('Não foi possível autenticar no Firebase. Verifique Authentication no console.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -42,7 +52,7 @@ export function AdminLoginPage() {
               />
             </label>
             {error && <p className="text-xs text-red-400">{error}</p>}
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={loading}>
               <LogIn size={16} />
               Entrar no painel
             </Button>

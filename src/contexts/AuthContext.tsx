@@ -13,6 +13,7 @@ import {
   signUp,
   signInWithGoogle,
   logOut,
+  signInDemoAnonymous,
   DEMO_USER,
   getFreshDemoUser,
 } from '@/services/firebase/auth'
@@ -30,7 +31,7 @@ interface AuthContextType {
   isOnline: boolean
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, displayName: string) => Promise<void>
-  loginDemo: () => void
+  loginDemo: () => Promise<void>
   loginWithGoogle: () => Promise<void>
   logout: () => Promise<void>
   refreshProfile: () => Promise<void>
@@ -43,7 +44,7 @@ const AuthContext = createContext<AuthContextType>({
   isOnline: true,
   login: async () => {},
   register: async () => {},
-  loginDemo: () => {},
+  loginDemo: async () => {},
   loginWithGoogle: async () => {},
   logout: async () => {},
   refreshProfile: async () => {},
@@ -124,8 +125,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signUp(email, password, displayName)
   }, [])
 
-  const loginDemo = useCallback(() => {
+  const loginDemo = useCallback(async () => {
     resetDemoUserData()
+    if (isConfigured) {
+      await signInDemoAnonymous()
+      return
+    }
     const freshUser = getFreshDemoUser()
     localStorage.setItem(SESSION_KEY, 'demo')
     setUser(freshUser)

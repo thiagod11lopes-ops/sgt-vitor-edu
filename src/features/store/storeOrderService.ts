@@ -1,15 +1,33 @@
 import type { PaymentMethod, StoreOrder, StoreOrderStatus, StoreProduct } from './storeTypes'
 import type { StoreBuyerData } from './storeBuyerTypes'
 import { PAYMENT_WINDOW_MS } from './storeTypes'
+import { COLLECTIONS } from '@/services/firebase/collections'
+import { adminDb, db, isConfigured, upsertDoc } from '@/services/firebase/firestoreHelpers'
+import { initFirestoreData, subscribeStoreOrders } from '@/services/firebase/firestoreInit'
 
 const ORDERS_KEY = 'sgt-vitor-store-orders'
 export const ORDERS_UPDATED_EVENT = 'sgt-orders-updated'
+
+let ordersCache: StoreOrder[] = []
+let subscriptionsStarted = false
 
 function notify() {
   window.dispatchEvent(new Event(ORDERS_UPDATED_EVENT))
 }
 
-function loadOrders(): StoreOrder[] {
+function ensureSubscriptions() {
+  if (subscriptionsStarted) return
+  subscriptionsStarted = true
+  if (!isConfigured) return
+
+  void initFirestoreData()
+  subscribeStoreOrders((items) => {
+    ordersCache = items
+    notify()
+  })
+}
+
+function loadOrdersLocal(): StoreOrder[] {
   try {
     const raw = localStorage.getItem(ORDERS_KEY)
     return raw ? JSON.parse(raw) : []
@@ -18,9 +36,15 @@ function loadOrders(): StoreOrder[] {
   }
 }
 
-function saveOrders(orders: StoreOrder[]) {
+function saveOrdersLocal(orders: StoreOrder[]) {
   localStorage.setItem(ORDERS_KEY, JSON.stringify(orders))
+  ordersCache = orders
   notify()
+}
+
+function getOrdersSnapshot(): StoreOrder[] {
+  ensureSubscriptions()
+  return isConfigured ? ordersCache : loadOrdersLocal()
 }
 
 function generatePickupCode(orderId: string) {
@@ -33,7 +57,7 @@ export function getPickupQrUrl(pickupCode: string) {
 
 export function expireOverdueOrders() {
   const now = Date.now()
-  const orders = loadOrders()
+  const orders = getOrdersSnapshot()
   let changed = false
 
   const updated = orders.map((o) => {
@@ -44,14 +68,23 @@ export function expireOverdueOrders() {
     return o
   })
 
-  if (changed) saveOrders(updated)
+  if (changed) {
+    if (isConfigured && db) {
+      const firestore = db
+      void Promise.all(
+        updated
+          .filter((o) => o.status === 'cancelled')
+          .map((o) => upsertDoc(firestore, COLLECTIONS.storeOrders, o.id, o)),
+      )
+    } else {
+      saveOrdersLocal(updated)
+    }
+  }
   return updated
 }
 
 export function getAllOrders(): StoreOrder[] {
-  return expireOverdueOrders().sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  )
+  return expireOverdueOrders()
 }
 
 export function getUserOrders(userId: string): StoreOrder[] {
@@ -60,20 +93,17 @@ export function getUserOrders(userId: string): StoreOrder[] {
 
 export function getActiveUserOrder(userId: string, productId: string): StoreOrder | undefined {
   return getUserOrders(userId).find(
-    (o) =>
-      o.productId === productId &&
-      !['completed', 'cancelled'].includes(o.status)
+    (o) => o.productId === productId && !['completed', 'cancelled'].includes(o.status),
   )
 }
 
-export function createOrder(
+export async function createOrder(
   userId: string,
   userName: string,
   userEmail: string,
   product: StoreProduct,
-  buyer: StoreBuyerData
-): StoreOrder {
-  const orders = getAllOrders()
+  buyer: StoreBuyerData,
+): Promise<StoreOrder> {
   const now = new Date().toISOString()
   const order: StoreOrder = {
     id: `ord-${Date.now()}`,
@@ -89,12 +119,18 @@ export function createOrder(
     createdAt: now,
     updatedAt: now,
   }
-  saveOrders([order, ...orders])
+
+  if (isConfigured && db) {
+    await upsertDoc(db, COLLECTIONS.storeOrders, order.id, order as object)
+    return order
+  }
+
+  saveOrdersLocal([order, ...getOrdersSnapshot()])
   return order
 }
 
-function patchOrder(orderId: string, patch: Partial<StoreOrder>): StoreOrder | null {
-  const orders = getAllOrders()
+async function patchOrder(orderId: string, patch: Partial<StoreOrder>, useAdminDb = false) {
+  const orders = getOrdersSnapshot()
   const idx = orders.findIndex((o) => o.id === orderId)
   if (idx < 0) return null
 
@@ -103,39 +139,54 @@ function patchOrder(orderId: string, patch: Partial<StoreOrder>): StoreOrder | n
     ...patch,
     updatedAt: new Date().toISOString(),
   }
+
+  if (isConfigured) {
+    const firestore = useAdminDb && adminDb ? adminDb : db
+    if (firestore) {
+      await upsertDoc(firestore, COLLECTIONS.storeOrders, orderId, updated as object)
+      return updated
+    }
+  }
+
   orders[idx] = updated
-  saveOrders(orders)
+  saveOrdersLocal(orders)
   return updated
 }
 
-export function adminMarkReceived(orderId: string) {
-  return patchOrder(orderId, {
-    status: 'received',
-    receivedAt: new Date().toISOString(),
-  })
+export async function adminMarkReceived(orderId: string) {
+  return patchOrder(
+    orderId,
+    { status: 'received', receivedAt: new Date().toISOString() },
+    true,
+  )
 }
 
-export function adminMarkSeparated(orderId: string) {
+export async function adminMarkSeparated(orderId: string) {
   const deadline = new Date(Date.now() + PAYMENT_WINDOW_MS).toISOString()
-  return patchOrder(orderId, {
-    status: 'separated',
-    separatedAt: new Date().toISOString(),
-    paymentDeadline: deadline,
-  })
+  return patchOrder(
+    orderId,
+    {
+      status: 'separated',
+      separatedAt: new Date().toISOString(),
+      paymentDeadline: deadline,
+    },
+    true,
+  )
 }
 
-export function adminMarkCompleted(orderId: string) {
-  return patchOrder(orderId, {
-    status: 'completed',
-    completedAt: new Date().toISOString(),
-  })
+export async function adminMarkCompleted(orderId: string) {
+  return patchOrder(
+    orderId,
+    { status: 'completed', completedAt: new Date().toISOString() },
+    true,
+  )
 }
 
-export function adminCancelOrder(orderId: string) {
-  return patchOrder(orderId, { status: 'cancelled' })
+export async function adminCancelOrder(orderId: string) {
+  return patchOrder(orderId, { status: 'cancelled' }, true)
 }
 
-export function confirmPayment(orderId: string, method: PaymentMethod) {
+export async function confirmPayment(orderId: string, method: PaymentMethod) {
   const pickupCode = generatePickupCode(orderId)
   return patchOrder(orderId, {
     status: 'paid',
@@ -169,6 +220,15 @@ export function getOrderStatusMessage(status: StoreOrderStatus): string {
   return messages[status]
 }
 
-export function clearUserStoreOrders(userId: string) {
-  saveOrders(loadOrders().filter((o) => o.userId !== userId))
+export async function clearUserStoreOrders(userId: string) {
+  const remaining = getOrdersSnapshot().filter((o) => o.userId !== userId)
+  if (isConfigured && db) {
+    const firestore = db
+    const toRemove = getOrdersSnapshot().filter((o) => o.userId === userId)
+    await Promise.all(
+      toRemove.map((o) => upsertDoc(firestore, COLLECTIONS.storeOrders, o.id, { ...o, status: 'cancelled' })),
+    )
+    return
+  }
+  saveOrdersLocal(remaining)
 }

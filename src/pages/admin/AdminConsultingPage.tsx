@@ -37,15 +37,15 @@ export function AdminConsultingPage() {
     return () => window.removeEventListener(CONSULTING_UPDATED_EVENT, refresh)
   }, [])
 
-  const handleReply = () => {
+  const handleReply = async () => {
     if (!selected || !reply.trim()) return
-    addExpertReply(selected.id, reply.trim())
+    await addExpertReply(selected.id, reply.trim())
     setReply('')
     refresh()
   }
 
-  const handleClose = (id: string) => {
-    updateSessionStatus(id, 'closed')
+  const handleClose = async (id: string) => {
+    await updateSessionStatus(id, 'closed')
     refresh()
   }
 

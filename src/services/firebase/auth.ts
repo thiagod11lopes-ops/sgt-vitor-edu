@@ -6,6 +6,7 @@ import {
   updateProfile,
   GoogleAuthProvider,
   signInWithPopup,
+  signInAnonymously,
   type User,
 } from 'firebase/auth'
 import { doc, setDoc, getDoc } from 'firebase/firestore'
@@ -74,6 +75,11 @@ export async function signInWithGoogle() {
   if (!auth) throw new Error('Firebase não configurado')
   const provider = new GoogleAuthProvider()
   return signInWithPopup(auth, provider)
+}
+
+export async function signInDemoAnonymous() {
+  if (!auth) throw new Error('Firebase não configurado')
+  return signInAnonymously(auth)
 }
 
 export async function logOut() {

@@ -26,4 +26,4 @@ if (isConfigured) {
   storage = getStorage(app)
 }
 
-export { app, auth, db, storage, isConfigured }
+export { app, auth, db, storage, isConfigured, firebaseConfig }

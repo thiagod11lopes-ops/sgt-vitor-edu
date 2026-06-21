@@ -1,10 +1,28 @@
+import { doc, setDoc } from 'firebase/firestore'
+import { db, isConfigured } from '@/services/firebase/config'
+import { initFirestoreData, subscribeVisitLog } from '@/services/firebase/firestoreInit'
+
 const VISITS_KEY = 'sgt-vitor-visit-log'
 
 interface VisitLog {
   [date: string]: number
 }
 
-function loadLog(): VisitLog {
+let logCache: VisitLog = {}
+let subscriptionsStarted = false
+
+function ensureSubscriptions() {
+  if (subscriptionsStarted) return
+  subscriptionsStarted = true
+  if (!isConfigured) return
+
+  void initFirestoreData()
+  subscribeVisitLog((log) => {
+    logCache = log
+  })
+}
+
+function loadLogLocal(): VisitLog {
   try {
     const raw = localStorage.getItem(VISITS_KEY)
     return raw ? JSON.parse(raw) : {}
@@ -13,19 +31,30 @@ function loadLog(): VisitLog {
   }
 }
 
-function saveLog(log: VisitLog) {
+function saveLogLocal(log: VisitLog) {
   localStorage.setItem(VISITS_KEY, JSON.stringify(log))
+  logCache = log
 }
 
-export function recordVisit() {
+export async function recordVisit() {
   const today = new Date().toISOString().split('T')[0]
-  const log = loadLog()
+
+  if (isConfigured && db) {
+    ensureSubscriptions()
+    const log = { ...logCache }
+    log[today] = (log[today] ?? 0) + 1
+    await setDoc(doc(db, 'analytics', 'visits'), { log }, { merge: true })
+    return
+  }
+
+  const log = loadLogLocal()
   log[today] = (log[today] ?? 0) + 1
-  saveLog(log)
+  saveLogLocal(log)
 }
 
 export function getVisitorStats() {
-  const log = loadLog()
+  ensureSubscriptions()
+  const log = isConfigured ? logCache : loadLogLocal()
   const now = new Date()
   const today = now.toISOString().split('T')[0]
   const monthPrefix = today.slice(0, 7)

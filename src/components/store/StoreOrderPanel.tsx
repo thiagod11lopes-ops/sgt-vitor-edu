@@ -28,11 +28,14 @@ export function StoreOrderPanel({ order, onUpdate }: StoreOrderPanelProps) {
   const [paying, setPaying] = useState(false)
   const { formatted, expired, remainingMs } = usePaymentCountdown(order)
 
-  const handlePay = () => {
+  const handlePay = async () => {
     setPaying(true)
-    confirmPayment(order.id, method)
-    setPaying(false)
-    onUpdate()
+    try {
+      await confirmPayment(order.id, method)
+      onUpdate()
+    } finally {
+      setPaying(false)
+    }
   }
 
   const statusVariant =

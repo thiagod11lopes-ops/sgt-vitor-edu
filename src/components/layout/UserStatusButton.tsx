@@ -47,7 +47,7 @@ export function UserStatusButton({ compact = false }: UserStatusButtonProps) {
     try {
       if (mode === 'login') {
         if (!isConfigured) {
-          loginDemo()
+          await loginDemo()
           setOpen(false)
           return
         }

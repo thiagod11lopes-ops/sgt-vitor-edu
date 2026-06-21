@@ -1,13 +1,31 @@
 import type { ConsultingMessage, ConsultingSession, ConsultingSessionStatus } from '@/types'
+import { COLLECTIONS } from '@/services/firebase/collections'
+import { adminDb, db, isConfigured, upsertDoc } from '@/services/firebase/firestoreHelpers'
+import { initFirestoreData, subscribeConsultingSessions } from '@/services/firebase/firestoreInit'
 
 const SESSIONS_KEY = 'sgt-vitor-consulting-sessions'
 export const CONSULTING_UPDATED_EVENT = 'sgt-consulting-updated'
+
+let sessionsCache: ConsultingSession[] = []
+let subscriptionsStarted = false
 
 function notifyUpdate() {
   window.dispatchEvent(new Event(CONSULTING_UPDATED_EVENT))
 }
 
-function loadSessions(): ConsultingSession[] {
+function ensureSubscriptions() {
+  if (subscriptionsStarted) return
+  subscriptionsStarted = true
+  if (!isConfigured) return
+
+  void initFirestoreData()
+  subscribeConsultingSessions((items) => {
+    sessionsCache = items
+    notifyUpdate()
+  })
+}
+
+function loadSessionsLocal(): ConsultingSession[] {
   try {
     const raw = localStorage.getItem(SESSIONS_KEY)
     return raw ? JSON.parse(raw) : []
@@ -16,32 +34,56 @@ function loadSessions(): ConsultingSession[] {
   }
 }
 
-function saveSessions(sessions: ConsultingSession[]) {
+function saveSessionsLocal(sessions: ConsultingSession[]) {
   localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions))
+  sessionsCache = sessions
   notifyUpdate()
 }
 
+function getSessions(): ConsultingSession[] {
+  ensureSubscriptions()
+  return isConfigured ? sessionsCache : loadSessionsLocal()
+}
+
+async function persistSession(session: ConsultingSession) {
+  if (isConfigured && db) {
+    await upsertDoc(db, COLLECTIONS.consultingSessions, session.id, session as object)
+    return
+  }
+  const sessions = loadSessionsLocal()
+  const idx = sessions.findIndex((s) => s.id === session.id)
+  if (idx >= 0) sessions[idx] = session
+  else sessions.unshift(session)
+  saveSessionsLocal(sessions)
+}
+
+async function persistSessionAdmin(session: ConsultingSession) {
+  if (isConfigured && adminDb) {
+    await upsertDoc(adminDb, COLLECTIONS.consultingSessions, session.id, session as object)
+    return
+  }
+  await persistSession(session)
+}
+
 export function getAllSessions(): ConsultingSession[] {
-  return loadSessions().sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  )
+  return getSessions()
 }
 
 export function getSessionByUserId(userId: string): ConsultingSession | undefined {
-  return loadSessions().find((s) => s.userId === userId)
+  return getSessions().find((s) => s.userId === userId)
 }
 
 export function getPendingSessionsCount(): number {
-  return loadSessions().filter((s) => s.status === 'pending').length
+  return getSessions().filter((s) => s.status === 'pending').length
 }
 
-export function createOrUpdateUserSession(
+export async function createOrUpdateUserSession(
   userId: string,
   userName: string,
   userEmail: string,
-  userMessage: Omit<ConsultingMessage, 'id'>
-): ConsultingSession {
-  const sessions = loadSessions()
+  userMessage: Omit<ConsultingMessage, 'id'>,
+): Promise<ConsultingSession> {
+  const sessions = getSessions()
   let session = sessions.find((s) => s.userId === userId && s.status !== 'closed')
 
   const msg: ConsultingMessage = { ...userMessage, id: `consult-${Date.now()}` }
@@ -58,20 +100,19 @@ export function createOrUpdateUserSession(
       createdAt: now,
       updatedAt: now,
     }
-    saveSessions([session, ...sessions])
+    await persistSession(session)
     return session
   }
 
   session.messages.push(msg)
   session.status = 'pending'
   session.updatedAt = now
-  saveSessions(sessions.map((s) => (s.id === session!.id ? session! : s)))
+  await persistSession(session)
   return session
 }
 
-export function addExpertReply(sessionId: string, content: string, expertName = 'Sgt Vitor') {
-  const sessions = loadSessions()
-  const session = sessions.find((s) => s.id === sessionId)
+export async function addExpertReply(sessionId: string, content: string, expertName = 'Sgt Vitor') {
+  const session = getSessions().find((s) => s.id === sessionId)
   if (!session) return null
 
   const msg: ConsultingMessage = {
@@ -85,17 +126,17 @@ export function addExpertReply(sessionId: string, content: string, expertName = 
   session.messages.push(msg)
   session.status = 'answered'
   session.updatedAt = new Date().toISOString()
-  saveSessions(sessions.map((s) => (s.id === sessionId ? session : s)))
+  await persistSessionAdmin(session)
   return session
 }
 
-export function updateSessionStatus(sessionId: string, status: ConsultingSessionStatus) {
-  const sessions = loadSessions()
-  saveSessions(
-    sessions.map((s) =>
-      s.id === sessionId ? { ...s, status, updatedAt: new Date().toISOString() } : s
-    )
-  )
+export async function updateSessionStatus(sessionId: string, status: ConsultingSessionStatus) {
+  const session = getSessions().find((s) => s.id === sessionId)
+  if (!session) return
+
+  session.status = status
+  session.updatedAt = new Date().toISOString()
+  await persistSessionAdmin(session)
 }
 
 export function getUserMessages(userId: string): ConsultingMessage[] {
@@ -103,6 +144,11 @@ export function getUserMessages(userId: string): ConsultingMessage[] {
   return session?.messages ?? []
 }
 
-export function clearUserConsultingSessions(userId: string) {
-  saveSessions(loadSessions().filter((s) => s.userId !== userId))
+export async function clearUserConsultingSessions(userId: string) {
+  const remaining = getSessions().filter((s) => s.userId !== userId)
+  if (!isConfigured) {
+    saveSessionsLocal(remaining)
+    return
+  }
+  saveSessionsLocal(remaining)
 }

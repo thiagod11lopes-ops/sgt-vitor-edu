@@ -1,38 +1,82 @@
 import { STORE_PRODUCTS } from './storeData'
 import type { StoreProduct } from './storeTypes'
+import { COLLECTIONS } from '@/services/firebase/collections'
+import { adminDb, isConfigured, removeDoc, upsertDoc } from '@/services/firebase/firestoreHelpers'
+import { initFirestoreData, subscribeStoreProducts } from '@/services/firebase/firestoreInit'
 
 const PRODUCTS_KEY = 'sgt-vitor-store-products'
 export const STORE_UPDATED_EVENT = 'sgt-store-updated'
+
+let productsCache: StoreProduct[] = STORE_PRODUCTS
+let subscriptionsStarted = false
 
 function notify() {
   window.dispatchEvent(new Event(STORE_UPDATED_EVENT))
 }
 
-export function getStoreProducts(): StoreProduct[] {
-  try {
-    const raw = localStorage.getItem(PRODUCTS_KEY)
-    return raw ? JSON.parse(raw) : STORE_PRODUCTS
-  } catch {
-    return STORE_PRODUCTS
-  }
+function ensureSubscriptions() {
+  if (subscriptionsStarted) return
+  subscriptionsStarted = true
+  if (!isConfigured) return
+
+  void initFirestoreData()
+  subscribeStoreProducts((items) => {
+    productsCache = items
+    notify()
+  })
 }
 
-export function saveStoreProducts(products: StoreProduct[]) {
+export function getStoreProducts(): StoreProduct[] {
+  ensureSubscriptions()
+  if (!isConfigured) {
+    try {
+      const raw = localStorage.getItem(PRODUCTS_KEY)
+      return raw ? JSON.parse(raw) : STORE_PRODUCTS
+    } catch {
+      return STORE_PRODUCTS
+    }
+  }
+  return productsCache
+}
+
+function saveLocal(products: StoreProduct[]) {
   localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products))
+  productsCache = products
   notify()
 }
 
-export function addStoreProduct(product: Omit<StoreProduct, 'id'>) {
-  const products = getStoreProducts()
+export async function addStoreProduct(product: Omit<StoreProduct, 'id'>) {
   const id = `p-${Date.now()}`
-  saveStoreProducts([...products, { ...product, id }])
+  const item = { ...product, id }
+
+  if (isConfigured && adminDb) {
+    await upsertDoc(adminDb, COLLECTIONS.storeProducts, id, item)
+    return id
+  }
+
+  saveLocal([...getStoreProducts(), item])
   return id
 }
 
-export function updateStoreProduct(id: string, data: Partial<StoreProduct>) {
-  saveStoreProducts(getStoreProducts().map((p) => (p.id === id ? { ...p, ...data } : p)))
+export async function updateStoreProduct(id: string, data: Partial<StoreProduct>) {
+  const current = getStoreProducts().find((p) => p.id === id)
+  if (!current) return
+
+  const updated = { ...current, ...data }
+
+  if (isConfigured && adminDb) {
+    await upsertDoc(adminDb, COLLECTIONS.storeProducts, id, updated)
+    return
+  }
+
+  saveLocal(getStoreProducts().map((p) => (p.id === id ? updated : p)))
 }
 
-export function deleteStoreProduct(id: string) {
-  saveStoreProducts(getStoreProducts().filter((p) => p.id !== id))
+export async function deleteStoreProduct(id: string) {
+  if (isConfigured && adminDb) {
+    await removeDoc(adminDb, COLLECTIONS.storeProducts, id)
+    return
+  }
+
+  saveLocal(getStoreProducts().filter((p) => p.id !== id))
 }

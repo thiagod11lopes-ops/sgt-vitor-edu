@@ -1,14 +1,37 @@
 import { VIDEOS as DEFAULT_VIDEOS } from '@/features/videos/videoData'
 import { DOCUMENTS as DEFAULT_DOCUMENTS } from '@/features/library/libraryData'
 import { deletePdfFile, parseLocalPdfKey } from '@/features/admin/pdfStorageService'
+import { COLLECTIONS } from '@/services/firebase/collections'
+import { adminDb, isConfigured, removeDoc, upsertDoc } from '@/services/firebase/firestoreHelpers'
+import { initFirestoreData, subscribeDocuments, subscribeVideos } from '@/services/firebase/firestoreInit'
 import type { Video, Document } from '@/types'
 
 const VIDEOS_KEY = 'sgt-vitor-videos'
 const DOCS_KEY = 'sgt-vitor-documents'
 export const CONTENT_UPDATED_EVENT = 'sgt-content-updated'
 
+let videosCache: Video[] = DEFAULT_VIDEOS
+let documentsCache: Document[] = DEFAULT_DOCUMENTS
+let subscriptionsStarted = false
+
 function notifyUpdate() {
   window.dispatchEvent(new Event(CONTENT_UPDATED_EVENT))
+}
+
+function ensureSubscriptions() {
+  if (subscriptionsStarted) return
+  subscriptionsStarted = true
+  if (!isConfigured) return
+
+  void initFirestoreData()
+  subscribeVideos((items) => {
+    videosCache = items
+    notifyUpdate()
+  })
+  subscribeDocuments((items) => {
+    documentsCache = items
+    notifyUpdate()
+  })
 }
 
 export function parseYoutubeId(input: string): string | null {
@@ -63,62 +86,115 @@ export function getVideoEmbedUrl(video: Pick<Video, 'youtubeId' | 'instagramUrl'
 }
 
 export function getVideos(): Video[] {
-  try {
-    const raw = localStorage.getItem(VIDEOS_KEY)
-    return raw ? JSON.parse(raw) : DEFAULT_VIDEOS
-  } catch {
-    return DEFAULT_VIDEOS
+  ensureSubscriptions()
+  if (!isConfigured) {
+    try {
+      const raw = localStorage.getItem(VIDEOS_KEY)
+      return raw ? JSON.parse(raw) : DEFAULT_VIDEOS
+    } catch {
+      return DEFAULT_VIDEOS
+    }
   }
+  return videosCache
 }
 
-export function saveVideos(videos: Video[]) {
+function saveVideosLocal(videos: Video[]) {
   localStorage.setItem(VIDEOS_KEY, JSON.stringify(videos))
+  videosCache = videos
   notifyUpdate()
 }
 
-export function addVideo(video: Omit<Video, 'id'>) {
-  const videos = getVideos()
+export async function addVideo(video: Omit<Video, 'id'>) {
   const id = `v-${Date.now()}`
-  saveVideos([...videos, { ...video, id }])
+  const item = { ...video, id }
+
+  if (isConfigured && adminDb) {
+    await upsertDoc(adminDb, COLLECTIONS.videos, id, item)
+    return id
+  }
+
+  saveVideosLocal([...getVideos(), item])
   return id
 }
 
-export function updateVideo(id: string, data: Partial<Video>) {
-  saveVideos(getVideos().map((v) => (v.id === id ? { ...v, ...data } : v)))
+export async function updateVideo(id: string, data: Partial<Video>) {
+  const current = getVideos().find((v) => v.id === id)
+  if (!current) return
+
+  const updated = { ...current, ...data }
+
+  if (isConfigured && adminDb) {
+    await upsertDoc(adminDb, COLLECTIONS.videos, id, updated)
+    return
+  }
+
+  saveVideosLocal(getVideos().map((v) => (v.id === id ? updated : v)))
 }
 
-export function deleteVideo(id: string) {
-  saveVideos(getVideos().filter((v) => v.id !== id))
+export async function deleteVideo(id: string) {
+  if (isConfigured && adminDb) {
+    await removeDoc(adminDb, COLLECTIONS.videos, id)
+    return
+  }
+
+  saveVideosLocal(getVideos().filter((v) => v.id !== id))
 }
 
 export function getDocuments(): Document[] {
-  try {
-    const raw = localStorage.getItem(DOCS_KEY)
-    return raw ? JSON.parse(raw) : DEFAULT_DOCUMENTS
-  } catch {
-    return DEFAULT_DOCUMENTS
+  ensureSubscriptions()
+  if (!isConfigured) {
+    try {
+      const raw = localStorage.getItem(DOCS_KEY)
+      return raw ? JSON.parse(raw) : DEFAULT_DOCUMENTS
+    } catch {
+      return DEFAULT_DOCUMENTS
+    }
   }
+  return documentsCache
 }
 
-export function saveDocuments(docs: Document[]) {
+function saveDocumentsLocal(docs: Document[]) {
   localStorage.setItem(DOCS_KEY, JSON.stringify(docs))
+  documentsCache = docs
   notifyUpdate()
 }
 
-export function addDocument(doc: Omit<Document, 'id'>) {
-  const docs = getDocuments()
+export async function addDocument(doc: Omit<Document, 'id'>) {
   const id = `doc-${Date.now()}`
-  saveDocuments([...docs, { ...doc, id }])
+  const item = { ...doc, id }
+
+  if (isConfigured && adminDb) {
+    await upsertDoc(adminDb, COLLECTIONS.documents, id, item)
+    return id
+  }
+
+  saveDocumentsLocal([...getDocuments(), item])
   return id
 }
 
-export function updateDocument(id: string, data: Partial<Document>) {
-  saveDocuments(getDocuments().map((d) => (d.id === id ? { ...d, ...data } : d)))
+export async function updateDocument(id: string, data: Partial<Document>) {
+  const current = getDocuments().find((d) => d.id === id)
+  if (!current) return
+
+  const updated = { ...current, ...data }
+
+  if (isConfigured && adminDb) {
+    await upsertDoc(adminDb, COLLECTIONS.documents, id, updated)
+    return
+  }
+
+  saveDocumentsLocal(getDocuments().map((d) => (d.id === id ? updated : d)))
 }
 
-export function deleteDocument(id: string) {
-  const doc = getDocuments().find((d) => d.id === id)
-  const pdfKey = doc ? parseLocalPdfKey(doc.url) : null
+export async function deleteDocument(id: string) {
+  const item = getDocuments().find((d) => d.id === id)
+  const pdfKey = item ? parseLocalPdfKey(item.url) : null
   if (pdfKey) void deletePdfFile(pdfKey)
-  saveDocuments(getDocuments().filter((d) => d.id !== id))
+
+  if (isConfigured && adminDb) {
+    await removeDoc(adminDb, COLLECTIONS.documents, id)
+    return
+  }
+
+  saveDocumentsLocal(getDocuments().filter((d) => d.id !== id))
 }

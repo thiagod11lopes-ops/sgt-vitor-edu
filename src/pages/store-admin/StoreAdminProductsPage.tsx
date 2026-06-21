@@ -30,7 +30,7 @@ export function StoreAdminProductsPage() {
 
   const refreshProducts = () => setProducts(getStoreProducts())
 
-  const handleSaveProduct = () => {
+  const handleSaveProduct = async () => {
     if (!form.name.trim()) return
     const data = {
       ...form,
@@ -38,8 +38,8 @@ export function StoreAdminProductsPage() {
       badge: form.badge || undefined,
       caliber: form.caliber || undefined,
     }
-    if (editingId) updateStoreProduct(editingId, data)
-    else addStoreProduct(data)
+    if (editingId) await updateStoreProduct(editingId, data)
+    else await addStoreProduct(data)
     setForm(emptyProduct)
     setEditingId(null)
     refreshProducts()
@@ -157,7 +157,7 @@ export function StoreAdminProductsPage() {
             </div>
             <div className="flex gap-1 shrink-0">
               <button onClick={() => startEdit(p)} className="p-1.5 rounded-lg hover:bg-white/5"><Pencil size={14} /></button>
-              <button onClick={() => { if (confirm('Remover?')) { deleteStoreProduct(p.id); refreshProducts() } }} className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400"><Trash2 size={14} /></button>
+              <button onClick={() => { if (confirm('Remover?')) { void deleteStoreProduct(p.id).then(refreshProducts) } }} className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400"><Trash2 size={14} /></button>
             </div>
           </div>
         ))}

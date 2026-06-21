@@ -8,6 +8,8 @@ export const COLLECTIONS = {
   documents: 'documents',
   storeProducts: 'storeProducts',
   storeOrders: 'storeOrders',
+  consultingSessions: 'consultingSessions',
+  registeredUsers: 'registeredUsers',
   consultingRequests: 'consultingRequests',
   analyticsEvents: 'analyticsEvents',
   pdfAssets: 'pdfAssets',

@@ -20,8 +20,9 @@ const links = [
 
 export function AdminLayout() {
   const handleLogout = () => {
-    logoutAdmin()
-    window.location.href = '/admin/login'
+    void logoutAdmin().finally(() => {
+      window.location.href = '/admin/login'
+    })
   }
 
   return (

@@ -90,9 +90,9 @@ export function AdminLibraryPage() {
       }
 
       if (editingId) {
-        updateDocument(editingId, data)
+        await updateDocument(editingId, data)
       } else {
-        addDocument(data)
+        await addDocument(data)
       }
 
       resetForm()
@@ -128,9 +128,10 @@ export function AdminLibraryPage() {
 
   const handleDelete = (id: string) => {
     if (confirm('Remover este documento?')) {
-      deleteDocument(id)
-      if (editingId === id) resetForm()
-      refresh()
+      void deleteDocument(id).then(() => {
+        if (editingId === id) resetForm()
+        refresh()
+      })
     }
   }
 

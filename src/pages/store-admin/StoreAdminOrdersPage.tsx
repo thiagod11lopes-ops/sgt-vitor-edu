@@ -84,22 +84,22 @@ export function StoreAdminOrdersPage() {
               )}
               <div className="flex flex-wrap gap-2">
                 {order.status === 'pending' && (
-                  <Button size="sm" onClick={() => { adminMarkReceived(order.id); refreshOrders() }}>
+                  <Button size="sm" onClick={() => { void adminMarkReceived(order.id).then(refreshOrders) }}>
                     <Package size={14} /> Confirmar recebimento
                   </Button>
                 )}
                 {order.status === 'received' && (
-                  <Button size="sm" onClick={() => { adminMarkSeparated(order.id); refreshOrders() }}>
+                  <Button size="sm" onClick={() => { void adminMarkSeparated(order.id).then(refreshOrders) }}>
                     <Clock size={14} /> Produto separado
                   </Button>
                 )}
                 {order.status === 'paid' && (
-                  <Button size="sm" variant="secondary" onClick={() => { adminMarkCompleted(order.id); refreshOrders() }}>
+                  <Button size="sm" variant="secondary" onClick={() => { void adminMarkCompleted(order.id).then(refreshOrders) }}>
                     Confirmar retirada
                   </Button>
                 )}
                 {!['completed', 'cancelled'].includes(order.status) && (
-                  <Button size="sm" variant="ghost" onClick={() => { adminCancelOrder(order.id); refreshOrders() }}>
+                  <Button size="sm" variant="ghost" onClick={() => { void adminCancelOrder(order.id).then(refreshOrders) }}>
                     Cancelar
                   </Button>
                 )}

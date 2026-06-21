@@ -2,58 +2,94 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Esquema compartilhado — ver src/services/firebase/collections.ts
-    // Ajuste regras antes de abrir ao público.
+    function isSystemAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'system-admin@sgt-vitor-edu.app';
+    }
+
+    function isStoreAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'store-admin@sgt-vitor-edu.app';
+    }
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
 
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isOwner(userId);
 
       match /messages/{messageId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
       }
 
       match /quizResults/{resultId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
       }
 
       match /history/{entryId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
       }
     }
 
     match /videos/{videoId} {
       allow read: if true;
-      allow write: if false; // admin via Cloud Functions ou custom claims
+      allow write: if isSystemAdmin();
     }
 
     match /documents/{documentId} {
       allow read: if true;
-      allow write: if false;
+      allow write: if isSystemAdmin();
     }
 
     match /storeProducts/{productId} {
       allow read: if true;
-      allow write: if false;
+      allow write: if isStoreAdmin();
     }
 
     match /storeOrders/{orderId} {
-      allow read, create: if request.auth != null;
-      allow update, delete: if false;
+      allow read: if isStoreAdmin()
+        || (request.auth != null && resource.data.userId == request.auth.uid);
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if isStoreAdmin()
+        || (request.auth != null && resource.data.userId == request.auth.uid);
+      allow delete: if isStoreAdmin();
+    }
+
+    match /consultingSessions/{sessionId} {
+      allow read: if isSystemAdmin()
+        || (request.auth != null && resource.data.userId == request.auth.uid);
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if isSystemAdmin()
+        || (request.auth != null && resource.data.userId == request.auth.uid);
+      allow delete: if isSystemAdmin();
+    }
+
+    match /registeredUsers/{userId} {
+      allow read: if isSystemAdmin();
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /analytics/visits {
+      allow read: if isSystemAdmin();
+      allow create, update: if true;
     }
 
     match /consultingRequests/{requestId} {
       allow read, create: if request.auth != null;
-      allow update, delete: if false;
+      allow update, delete: if isSystemAdmin();
     }
 
     match /analyticsEvents/{eventId} {
       allow create: if true;
-      allow read, update, delete: if false;
+      allow read, update, delete: if isSystemAdmin();
     }
 
     match /pdfAssets/{assetId} {
       allow read: if true;
-      allow write: if false;
+      allow write: if isSystemAdmin();
     }
   }
 }

@@ -32,7 +32,7 @@ export function AdminVideosPage() {
 
   const refresh = () => setVideos(getVideos())
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.title.trim()) return
 
     const youtubeId = parseYoutubeId(form.youtubeLink)
@@ -59,15 +59,18 @@ export function AdminVideosPage() {
       duration: form.duration || undefined,
     }
 
-    if (editingId) {
-      updateVideo(editingId, data)
-    } else {
-      addVideo(data)
+    try {
+      if (editingId) {
+        await updateVideo(editingId, data)
+      } else {
+        await addVideo(data)
+      }
+      setForm(emptyForm)
+      setEditingId(null)
+      refresh()
+    } catch {
+      setLinkError('Erro ao salvar no Firebase. Faça login no admin e verifique Authentication.')
     }
-
-    setForm(emptyForm)
-    setEditingId(null)
-    refresh()
   }
 
   const startEdit = (video: Video) => {
@@ -85,8 +88,7 @@ export function AdminVideosPage() {
 
   const handleDelete = (id: string) => {
     if (confirm('Remover este vídeo?')) {
-      deleteVideo(id)
-      refresh()
+      void deleteVideo(id).then(refresh)
     }
   }
 

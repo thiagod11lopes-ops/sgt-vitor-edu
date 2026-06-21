@@ -43,10 +43,13 @@ export function ConsultingPage() {
   const send = async () => {
     if (!input.trim() || sending) return
     setSending(true)
-    sendUserConsultingMessage(uid, userName, userEmail, input.trim())
-    setInput('')
-    refresh()
-    setSending(false)
+    try {
+      await sendUserConsultingMessage(uid, userName, userEmail, input.trim())
+      setInput('')
+      refresh()
+    } finally {
+      setSending(false)
+    }
   }
 
   return (

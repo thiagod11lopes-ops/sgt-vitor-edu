@@ -1,14 +1,16 @@
-const ADMIN_SESSION_KEY = 'sgt-vitor-admin-session'
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'sgtvitor2024'
+import { ensureAdminFirebaseAuth, signOutAdminFirebase } from '@/services/firebase/adminFirebaseAuth'
 
-export function loginAdmin(password: string): boolean {
-  if (password !== ADMIN_PASSWORD) return false
-  localStorage.setItem(ADMIN_SESSION_KEY, '1')
-  return true
+const ADMIN_SESSION_KEY = 'sgt-vitor-admin-session'
+
+export async function loginAdmin(password: string): Promise<boolean> {
+  const ok = await ensureAdminFirebaseAuth('system', password)
+  if (ok) localStorage.setItem(ADMIN_SESSION_KEY, '1')
+  return ok
 }
 
-export function logoutAdmin() {
+export async function logoutAdmin() {
   localStorage.removeItem(ADMIN_SESSION_KEY)
+  await signOutAdminFirebase()
 }
 
 export function isAdminSessionActive(): boolean {
