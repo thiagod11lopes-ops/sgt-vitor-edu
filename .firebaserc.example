@@ -1,14 +1,5 @@
 {
   "projects": {
     "default": "your_project_id"
-  },
-  "targets": {
-    "your_project_id": {
-      "hosting": {
-        "app": ["sgt-vitor-app"],
-        "system-admin": ["sgt-vitor-system-admin"],
-        "store-admin": ["sgt-vitor-store-admin"]
-      }
-    }
   }
 }

@@ -59,14 +59,17 @@ cp .env.example .env
 npm run dev
 ```
 
-### GitHub e deploy (3 URLs)
+### GitHub Pages + Firebase (banco)
 
-O mesmo código publica **app**, **admin sistema** e **admin loja** em domínios separados, com **um único Firebase**. Veja o guia completo em [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+- **Site público:** GitHub Pages — deploy automático a cada `push`
+- **Banco de dados:** Firebase (Firestore, Auth, Storage) — **não** hospeda o app
+
+Guia completo: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+
+**URL:** https://thiagod11lopes-ops.github.io/sgt-vitor-edu/
 
 ```bash
-npm run build:app      # PWA — usuários
-npm run build:admin    # Painel administrativo
-npm run build:store    # Painel da loja
+git push origin master   # publica/atualiza o site automaticamente
 ```
 
 ### Firebase

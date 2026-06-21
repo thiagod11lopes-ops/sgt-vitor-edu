@@ -1,8 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches: [main, master]
   pull_request:
     branches: [main, master]
 
@@ -24,14 +22,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck and build (dev — todas as rotas)
+      - name: Build (GitHub Pages path)
+        env:
+          VITE_BASE_PATH: /sgt-vitor-edu/
         run: npm run build
 
-      - name: Build app surface
-        run: npm run build:app
-
-      - name: Build system admin surface
-        run: npm run build:admin
-
-      - name: Build store admin surface
-        run: npm run build:store
+      - name: Build local (dev)
+        run: npm run build

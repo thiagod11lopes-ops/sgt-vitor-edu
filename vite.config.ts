@@ -4,7 +4,10 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 
+const base = process.env.VITE_BASE_PATH || '/'
+
 export default defineConfig({
+  base,
   appType: 'spa',
   plugins: [
     react(),
@@ -20,10 +23,10 @@ export default defineConfig({
         background_color: '#0a0a0f',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
+        start_url: base,
         icons: [
           {
-            src: '/favicon.svg',
+            src: `${base}favicon.svg`,
             sizes: '512x512',
             type: 'image/svg+xml',
             purpose: 'any maskable',
@@ -32,7 +35,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        navigateFallback: '/index.html',
+        navigateFallback: `${base}index.html`,
       },
     }),
   ],

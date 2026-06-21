@@ -19,6 +19,7 @@ export function getDeploymentSurface(): DeploymentSurface {
 
   const hostname = window.location.hostname
   if (hostname === 'localhost' || hostname === '127.0.0.1') return 'all'
+  if (hostname.endsWith('.github.io')) return 'all'
 
   const storeHost = parseHostname(import.meta.env.VITE_STORE_ADMIN_URL)
   const adminHost = parseHostname(import.meta.env.VITE_SYSTEM_ADMIN_URL)

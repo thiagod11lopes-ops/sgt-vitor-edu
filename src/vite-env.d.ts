@@ -11,6 +11,7 @@ interface ImportMetaEnv {
   readonly VITE_AI_API_URL: string
   readonly VITE_ADMIN_PASSWORD: string
   readonly VITE_STORE_ADMIN_PASSWORD: string
+  readonly VITE_BASE_PATH: string
   readonly VITE_APP_URL: string
   readonly VITE_SYSTEM_ADMIN_URL: string
   readonly VITE_STORE_ADMIN_URL: string
