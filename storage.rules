@@ -1,5 +1,6 @@
 rules_version = '2';
 
+// Fotos de perfil: profile-photos/{userId}/*
 service firebase.storage {
   match /b/{bucket}/o {
     match /profile-photos/{userId}/{fileName} {
