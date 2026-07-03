@@ -20,6 +20,7 @@ import {
 import { isConfigured } from '@/services/firebase/config'
 import { registerOrUpdateUser } from '@/features/admin/userRegistryService'
 import { resetDemoUserData } from '@/features/demo/demoDataService'
+import { uploadProfilePhoto } from '@/features/profile/profilePhotoService'
 import type { UserProfile } from '@/types'
 
 const SESSION_KEY = 'sgt-vitor-auth-session'
@@ -35,6 +36,7 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>
   logout: () => Promise<void>
   refreshProfile: () => Promise<void>
+  updateProfilePhoto: (file: File) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -48,6 +50,7 @@ const AuthContext = createContext<AuthContextType>({
   loginWithGoogle: async () => {},
   logout: async () => {},
   refreshProfile: async () => {},
+  updateProfilePhoto: async () => {},
 })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -96,16 +99,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsub = onAuthChange(async (firebaseUser) => {
       if (firebaseUser) {
         const profile = await getUserProfile(firebaseUser.uid)
-        const merged =
+        const base =
           profile ?? {
             ...DEMO_USER,
             uid: firebaseUser.uid,
             email: firebaseUser.email ?? '',
             displayName: firebaseUser.displayName ?? DEMO_USER.displayName,
           }
-        setUser(merged)
+        const withPhoto = {
+          ...base,
+          photoURL: base.photoURL ?? firebaseUser.photoURL ?? undefined,
+        }
+        setUser(withPhoto)
         setIsAuthenticated(true)
-        trackUser(merged)
+        trackUser(withPhoto)
       } else {
         setUser(null)
         setIsAuthenticated(false)
@@ -138,6 +145,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     trackUser(freshUser)
   }, [trackUser])
 
+  const updateProfilePhoto = useCallback(
+    async (file: File) => {
+      if (!user?.uid) throw new Error('Entre na sua conta para alterar a foto.')
+
+      const photoURL = await uploadProfilePhoto(user.uid, file, user.photoURL)
+      setUser({ ...user, photoURL })
+      if (isConfigured) await refreshProfile()
+    },
+    [user, refreshProfile],
+  )
+
   const loginWithGoogle = useCallback(async () => {
     if (!isConfigured) throw new Error('Configure o Firebase para login com Google.')
     await signInWithGoogle()
@@ -166,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginWithGoogle,
         logout,
         refreshProfile,
+        updateProfilePhoto,
       }}
     >
       {children}

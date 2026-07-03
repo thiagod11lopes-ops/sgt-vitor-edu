@@ -14,6 +14,7 @@ import { auth, db, isConfigured } from './config'
 import type { UserProfile } from '@/types'
 import { generateReferralCode } from '@/lib/utils'
 import { getDefaultProfilePhoto } from '@/lib/profileAssets'
+import { loadDemoPhotoURL } from '@/features/profile/profilePhotoService'
 
 const DEMO_USER: UserProfile = {
   uid: 'demo-user',
@@ -36,6 +37,7 @@ export function getFreshDemoUser(): UserProfile {
   const today = new Date().toISOString().split('T')[0]
   return {
     ...DEMO_USER,
+    photoURL: loadDemoPhotoURL(DEMO_USER.uid) ?? getDefaultProfilePhoto(),
     dailyQuestionsUsed: 0,
     dailyQuestionsReset: today,
     totalQuestions: 0,

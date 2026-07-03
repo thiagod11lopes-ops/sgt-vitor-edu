@@ -24,6 +24,7 @@ export const USER_SUBCOLLECTIONS = {
 export const STORAGE_PATHS = {
   pdfRoot: 'library/pdfs',
   storeImages: 'store/images',
+  profilePhotos: 'profile-photos',
 } as const
 
 /** Chaves localStorage usadas hoje — referência para migração ao Firestore */

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { SurfaceLink } from '@/components/routing/SurfaceLink'
 import { motion } from 'framer-motion'
@@ -28,16 +29,18 @@ import { Badge } from '@/components/ui/Badge'
 import { UserStatusButton } from '@/components/layout/UserStatusButton'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import { resolveProfilePhoto } from '@/lib/profileAssets'
+import { ProfileAvatarEditor } from '@/components/profile/ProfileAvatarEditor'
 import { PLAN_PRICES } from '@/types'
 import { GOAL_OPTIONS, KNOWLEDGE_LEVEL_OPTIONS } from '@/features/onboarding/onboardingData'
 
 export function ProfilePage() {
-  const { user } = useAuthContext()
+  const { user, updateProfilePhoto } = useAuthContext()
   const { plan, questionsUsed, isPremium } = useSubscription()
   const { referralCode, copied, copyLink, shareLink, stats } = useReferral()
   const { personalization, updatePersonalization } = usePersonalization()
   const { enablePush, pushEnabled } = useNotifications()
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const [photoError, setPhotoError] = useState('')
 
   const uid = user?.uid ?? 'demo-user'
   const recordStats = [
@@ -47,14 +50,25 @@ export function ProfilePage() {
 
   return (
     <div className="h-[calc(100dvh-5rem)] overflow-y-auto hide-scrollbar pb-8">
-      <header className="glass-strong safe-top px-4 py-6 text-center">
-        <div className="w-20 h-20 rounded-full mx-auto mb-3 shadow-lg shadow-blue-500/20 overflow-hidden ring-2 ring-accent/40 ring-offset-2 ring-offset-bg-primary">
-          <img
-            src={resolveProfilePhoto(user?.photoURL)}
-            alt={user?.displayName ?? 'Foto de perfil'}
-            className="w-full h-full object-cover object-[center_20%]"
-          />
-        </div>
+      <header className="glass-strong safe-top px-4 pt-6 pb-8 text-center">
+        <ProfileAvatarEditor
+          className="mb-3"
+          photoURL={user?.photoURL}
+          displayName={user?.displayName}
+          uploading={photoUploading}
+          error={photoError}
+          onSelectFile={async (file) => {
+            setPhotoError('')
+            setPhotoUploading(true)
+            try {
+              await updateProfilePhoto(file)
+            } catch (error) {
+              setPhotoError(error instanceof Error ? error.message : 'Não foi possível salvar a foto.')
+            } finally {
+              setPhotoUploading(false)
+            }
+          }}
+        />
         <h1 className="text-lg font-bold">{user?.displayName ?? 'Aluno'}</h1>
         <p className="text-xs text-text-muted">{user?.email}</p>
         <div className="flex items-center justify-center gap-1.5 mt-2 flex-wrap">

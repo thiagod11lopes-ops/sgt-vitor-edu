@@ -5,8 +5,11 @@ export function getDefaultProfilePhoto(): string {
   return `${base}/${DEFAULT_PROFILE_PHOTO}`
 }
 
+import { isLocalProfilePhotoUrl } from '@/features/profile/profilePhotoStorage'
+
 export function resolveProfilePhoto(photoURL?: string): string {
   if (!photoURL?.trim()) return getDefaultProfilePhoto()
+  if (isLocalProfilePhotoUrl(photoURL)) return getDefaultProfilePhoto()
   if (/^(https?:|data:)/i.test(photoURL)) return photoURL
 
   const normalized = photoURL.replace(/^\//, '')
