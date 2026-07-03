@@ -18,21 +18,18 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      - name: Aviso — FIREBASE_TOKEN não configurado
-        if: secrets.FIREBASE_TOKEN == ''
+      - name: Deploy Firestore and Storage rules
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          echo "::warning::Secret FIREBASE_TOKEN ausente no GitHub. Regras não serão publicadas por este workflow."
-          echo "Para ativar: npm run firebase:ci-token → Settings → Secrets → Actions → FIREBASE_TOKEN"
+          if [ -z "$FIREBASE_TOKEN" ]; then
+            echo "::warning::Secret FIREBASE_TOKEN ausente. Configure em Settings → Secrets → Actions."
+            echo "Gere o token localmente: npm run firebase:ci-token"
+            exit 0
+          fi
 
-      - name: Deploy Firestore rules
-        if: secrets.FIREBASE_TOKEN != ''
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-        run: firebase deploy --only firestore --project sgt-vitor-edu --non-interactive --token "$FIREBASE_TOKEN"
+          firebase deploy --only firestore --project sgt-vitor-edu --non-interactive --token "$FIREBASE_TOKEN"
 
-      - name: Deploy Storage rules
-        if: secrets.FIREBASE_TOKEN != ''
-        continue-on-error: true
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-        run: firebase deploy --only storage --project sgt-vitor-edu --non-interactive --token "$FIREBASE_TOKEN"
+          if ! firebase deploy --only storage --project sgt-vitor-edu --non-interactive --token "$FIREBASE_TOKEN"; then
+            echo "::warning::Storage rules não publicadas. Ative o Firebase Storage no Console se ainda não fez."
+          fi
