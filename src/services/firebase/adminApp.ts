@@ -1,5 +1,10 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app'
-import { getAuth, setPersistence, browserLocalPersistence, type Auth } from 'firebase/auth'
+import {
+  initializeAuth,
+  indexedDBLocalPersistence,
+  browserPopupRedirectResolver,
+  type Auth,
+} from 'firebase/auth'
 import { getFirestore, type Firestore } from 'firebase/firestore'
 import { firebaseConfig, isConfigured } from './config'
 
@@ -11,9 +16,9 @@ let adminDb: Firestore | null = null
 
 if (isConfigured) {
   adminApp = initializeApp(firebaseConfig, ADMIN_APP_NAME)
-  adminAuth = getAuth(adminApp)
-  void setPersistence(adminAuth, browserLocalPersistence).catch(() => {
-    /* Safari modo privado pode bloquear — login ainda funciona na sessão */
+  adminAuth = initializeAuth(adminApp, {
+    persistence: indexedDBLocalPersistence,
+    popupRedirectResolver: browserPopupRedirectResolver,
   })
   adminDb = getFirestore(adminApp)
 }

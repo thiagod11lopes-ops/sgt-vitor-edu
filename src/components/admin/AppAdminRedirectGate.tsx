@@ -23,8 +23,8 @@ export function AppAdminRedirectGate({ children }: { children: React.ReactNode }
 
       if (result?.ok) {
         navigate('/admin', { replace: true })
-      } else {
-        navigate('/admin/login', { replace: true })
+      } else if (result) {
+        navigate('/admin/login', { replace: true, state: { adminLoginError: result.error } })
       }
       setBlocking(false)
     })()

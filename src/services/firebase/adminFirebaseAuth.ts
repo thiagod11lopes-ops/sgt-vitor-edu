@@ -57,17 +57,48 @@ function credentialsFor(role: AdminRole) {
   }
 }
 
-function firebaseErrorCode(error: unknown): string | undefined {
-  return (error as { code?: string }).code
+function firebaseErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : ''
 }
 
-/** Safari/iOS bloqueiam pop-up do Google com frequência — usar redirect. */
-export function prefersGoogleRedirectAuth(): boolean {
-  if (typeof navigator === 'undefined') return false
-  const ua = navigator.userAgent
-  const isIOS = /iPad|iPhone|iPod/i.test(ua)
-  const isSafari = /Safari/i.test(ua) && !/Chrom(e|ium)|CriOS|FxiOS|EdgiOS/i.test(ua)
-  return isIOS || isSafari
+function isMissingRedirectStateError(error: unknown): boolean {
+  const code = firebaseErrorCode(error)
+  const message = firebaseErrorMessage(error).toLowerCase()
+  return (
+    code === 'auth/argument-error' ||
+    code === 'auth/invalid-credential' ||
+    message.includes('missing initial state') ||
+    message.includes('initial state')
+  )
+}
+
+function clearAdminRedirectPending(): void {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(REDIRECT_PENDING_KEY)
+    localStorage.removeItem(REDIRECT_ROLE_KEY)
+  }
+  redirectFlowPromise = null
+}
+
+function markAdminRedirectPending(role: AdminRole): void {
+  localStorage.setItem(REDIRECT_ROLE_KEY, role)
+  localStorage.setItem(REDIRECT_PENDING_KEY, '1')
+}
+
+async function signInAdminWithGoogleRedirect(
+  role: AdminRole,
+  provider: GoogleAuthProvider,
+): Promise<AdminGoogleAuthResult> {
+  if (!adminAuth) {
+    return { ok: false, firebaseOk: false, errorMessage: 'Firebase não configurado.' }
+  }
+  markAdminRedirectPending(role)
+  await signInWithRedirect(adminAuth, provider)
+  return { ok: false, firebaseOk: false, redirecting: true }
+}
+
+function firebaseErrorCode(error: unknown): string | undefined {
+  return (error as { code?: string }).code
 }
 
 async function signInOrCreateAdmin(email: string, password: string): Promise<AdminAuthResult> {
@@ -199,15 +230,37 @@ export async function completeAdminGoogleRedirect(
       try {
         await adminAuth.authStateReady()
         const cred = await getRedirectResult(adminAuth)
-        if (!cred) return null
+        if (!cred) {
+          const hadPending = localStorage.getItem(REDIRECT_PENDING_KEY) === '1'
+          clearAdminRedirectPending()
+          if (hadPending) {
+            return {
+              ok: false,
+              firebaseOk: false,
+              errorCode: 'auth/missing-initial-state',
+              errorMessage:
+                'O Safari não conseguiu concluir o login. Toque em Entrar com Google novamente.',
+            }
+          }
+          return null
+        }
 
         const storedRole = (localStorage.getItem(REDIRECT_ROLE_KEY) as AdminRole | null) ?? expectedRole
-        localStorage.removeItem(REDIRECT_PENDING_KEY)
-        localStorage.removeItem(REDIRECT_ROLE_KEY)
+        clearAdminRedirectPending()
 
         return processGoogleCredential(storedRole, cred)
       } catch (error: unknown) {
+        clearAdminRedirectPending()
         const code = firebaseErrorCode(error)
+        if (isMissingRedirectStateError(error)) {
+          return {
+            ok: false,
+            firebaseOk: false,
+            errorCode: 'auth/missing-initial-state',
+            errorMessage:
+              'O Safari bloqueou o retorno do Google. Toque em Entrar com Google novamente.',
+          }
+        }
         return {
           ok: false,
           firebaseOk: false,
@@ -236,13 +289,6 @@ export async function signInAdminWithGoogle(role: AdminRole): Promise<AdminGoogl
   const provider = new GoogleAuthProvider()
   provider.setCustomParameters({ prompt: 'select_account' })
 
-  if (prefersGoogleRedirectAuth()) {
-    localStorage.setItem(REDIRECT_ROLE_KEY, role)
-    localStorage.setItem(REDIRECT_PENDING_KEY, '1')
-    await signInWithRedirect(adminAuth, provider)
-    return { ok: false, firebaseOk: false, redirecting: true }
-  }
-
   try {
     const cred = await signInWithPopup(adminAuth, provider)
     return processGoogleCredential(role, cred)
@@ -255,10 +301,7 @@ export async function signInAdminWithGoogle(role: AdminRole): Promise<AdminGoogl
       code === 'auth/popup-blocked' ||
       code === 'auth/cancelled-popup-request'
     ) {
-      localStorage.setItem(REDIRECT_ROLE_KEY, role)
-      localStorage.setItem(REDIRECT_PENDING_KEY, '1')
-      await signInWithRedirect(adminAuth, provider)
-      return { ok: false, firebaseOk: false, redirecting: true }
+      return signInAdminWithGoogleRedirect(role, provider)
     }
     if (code === 'permission-denied') {
       return {
@@ -288,6 +331,9 @@ export function adminFirebaseErrorMessage(code?: string): string | null {
   }
   if (code === 'auth/wrong-password-in-firebase') {
     return 'Senha correta no app, mas a conta Firebase está diferente. Exclua o usuário admin no Firebase Console e entre de novo.'
+  }
+  if (code === 'auth/missing-initial-state') {
+    return 'O Safari bloqueou o retorno do Google. Toque em Entrar com Google novamente.'
   }
   return firebaseAuthErrorMessage(code)
 }

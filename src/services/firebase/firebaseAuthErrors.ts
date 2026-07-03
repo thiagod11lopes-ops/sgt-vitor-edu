@@ -22,6 +22,9 @@ export function firebaseAuthErrorMessage(code?: string): string | null {
     return 'Pop-up bloqueado. Permita pop-ups para este site e tente novamente.'
   }
   if (code === 'auth/popup-closed-by-user') return null
+  if (code === 'auth/missing-initial-state') {
+    return 'O Safari bloqueou o retorno do Google. Toque em Entrar com Google novamente.'
+  }
   if (code === 'auth/too-many-requests') {
     return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'
   }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { Shield, ArrowLeft } from 'lucide-react'
 import {
   loginAdminWithGoogle,
@@ -14,8 +14,14 @@ import { AdminGoogleLoginButton } from '@/components/admin/AdminGoogleLoginButto
 export function AdminLoginPage() {
   const [error, setError] = useState('')
   const navigate = useNavigate()
+  const location = useLocation()
   const [redirecting, setRedirecting] = useState(false)
   const [checking, setChecking] = useState(true)
+
+  useEffect(() => {
+    const stateError = (location.state as { adminLoginError?: string } | null)?.adminLoginError
+    if (stateError) setError(stateError)
+  }, [location.state])
 
   useEffect(() => {
     let cancelled = false
