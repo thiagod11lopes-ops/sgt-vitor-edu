@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -61,7 +61,26 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deploy1.outputs.page_url || steps.deploy2.outputs.page_url || steps.deployment.outputs.page_url }}
     steps:
-      - id: deployment
+      - name: Deploy to GitHub Pages (tentativa 1)
+        id: deploy1
         uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Deploy to GitHub Pages (tentativa 2)
+        id: deploy2
+        if: steps.deploy1.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Deploy to GitHub Pages (tentativa 3)
+        id: deployment
+        if: steps.deploy2.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+
+      - name: Falha no deploy
+        if: steps.deploy1.outcome != 'success' && steps.deploy2.outcome != 'success' && (steps.deployment.outcome != 'success' || steps.deployment.outcome == 'skipped')
+        run: |
+          echo "::error::GitHub Pages recusou o deploy após 3 tentativas. Reexecute o workflow manualmente."
+          exit 1
