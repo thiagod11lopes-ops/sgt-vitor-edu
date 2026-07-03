@@ -13,34 +13,57 @@ export const CONTENT_UPDATED_EVENT = 'sgt-content-updated'
 let videosCache: Video[] = []
 let documentsCache: Document[] = DEFAULT_DOCUMENTS
 let subscriptionsStarted = false
-let initPromise: Promise<void> | null = null
 let videosReady = !isConfigured
+let resolveVideosReady: (() => void) | null = null
+let videosReadyPromise: Promise<void> | null = null
+
+const VIDEOS_LOAD_TIMEOUT_MS = 8000
 
 function notifyUpdate() {
   window.dispatchEvent(new Event(CONTENT_UPDATED_EVENT))
 }
 
+function markVideosReady() {
+  if (videosReady) return
+  videosReady = true
+  resolveVideosReady?.()
+  resolveVideosReady = null
+  notifyUpdate()
+}
+
 function startFirestoreSubscriptions() {
-  if (subscriptionsStarted) return initPromise ?? Promise.resolve()
+  if (subscriptionsStarted) return videosReadyPromise ?? Promise.resolve()
   subscriptionsStarted = true
+
   if (!isConfigured) {
     videosReady = true
     return Promise.resolve()
   }
 
-  initPromise = initFirestoreData().then(() => {
-    subscribeVideos((items) => {
-      videosCache = items
-      videosReady = true
-      notifyUpdate()
-    })
-    subscribeDocuments((items) => {
-      documentsCache = items
-      notifyUpdate()
-    })
+  videosReadyPromise = new Promise<void>((resolve) => {
+    resolveVideosReady = resolve
+    setTimeout(() => {
+      markVideosReady()
+      resolve()
+    }, VIDEOS_LOAD_TIMEOUT_MS)
   })
 
-  return initPromise
+  subscribeVideos((items) => {
+    videosCache = items
+    markVideosReady()
+  })
+
+  subscribeDocuments((items) => {
+    documentsCache = items
+    notifyUpdate()
+  })
+
+  void initFirestoreData().catch((error) => {
+    console.error('Firestore init failed:', error)
+    markVideosReady()
+  })
+
+  return videosReadyPromise
 }
 
 function ensureSubscriptions() {

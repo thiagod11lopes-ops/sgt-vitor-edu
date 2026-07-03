@@ -51,30 +51,35 @@ export function subscribeCollection<T>(
   onData: (items: T[]) => void,
 ) {
   let lastItems: T[] = []
+  let notified = false
 
   return onSnapshot(
     collection(firestore, name),
-    { includeMetadataChanges: true },
     (snap) => {
       const items = snap.docs.map((d) => mapDoc(d.data(), d.id))
 
       if (items.length > 0) {
         lastItems = items
+        notified = true
         onData(items)
         return
       }
 
-      // Evita limpar a lista enquanto o Firestore ainda carrega (comum em mobile)
-      if (snap.metadata.fromCache) {
-        onData(lastItems.length > 0 ? lastItems : fallback)
+      if (!snap.metadata.fromCache) {
+        lastItems = []
+        notified = true
+        onData([])
         return
       }
 
-      lastItems = []
-      onData([])
+      if (!notified) {
+        notified = true
+        onData(lastItems.length > 0 ? lastItems : fallback)
+      }
     },
     (error) => {
       console.error(`Firestore subscription failed (${name}):`, error)
+      if (!notified) notified = true
       onData(lastItems.length > 0 ? lastItems : fallback)
     },
   )
