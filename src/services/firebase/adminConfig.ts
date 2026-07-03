@@ -46,13 +46,28 @@ export async function registerGoogleAdminEmail(role: AdminRole, email: string): 
   const normalized = email.trim().toLowerCase()
   const field = role === 'system' ? 'systemGoogleEmails' : 'storeGoogleEmails'
   const config = await loadAdminConfig()
+  const envEmails = getAllowedGoogleEmails(role)
   const current = config[field]
 
-  if (current.includes(normalized)) return
+  if (current.includes(normalized) && envEmails.every((e) => current.includes(e))) return
+
+  const nextSystem = new Set(config.systemGoogleEmails)
+  const nextStore = new Set(config.storeGoogleEmails)
+
+  if (role === 'system') {
+    nextSystem.add(normalized)
+    envEmails.forEach((e) => nextSystem.add(e))
+  } else {
+    nextStore.add(normalized)
+    envEmails.forEach((e) => nextStore.add(e))
+  }
 
   await setDoc(
     doc(adminDb, 'config', 'admins'),
-    { [field]: [...current, normalized] },
+    {
+      systemGoogleEmails: [...nextSystem],
+      storeGoogleEmails: [...nextStore],
+    },
     { merge: true },
   )
 }

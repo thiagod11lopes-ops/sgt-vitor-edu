@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Camera } from 'lucide-react'
-import { resolveProfilePhoto } from '@/lib/profileAssets'
+import { getDefaultProfilePhoto, resolveProfilePhoto } from '@/lib/profileAssets'
 import {
   getProfilePhotoObjectUrl,
   parseLocalProfilePhotoKey,
@@ -27,6 +27,16 @@ export function ProfileAvatarEditor({
   const [previewSrc, setPreviewSrc] = useState(() => resolveProfilePhoto(photoURL))
 
   useEffect(() => {
+    if (!photoURL?.trim()) {
+      setPreviewSrc(getDefaultProfilePhoto())
+      return
+    }
+
+    if (photoURL.startsWith('data:') || /^https?:/i.test(photoURL)) {
+      setPreviewSrc(resolveProfilePhoto(photoURL))
+      return
+    }
+
     const localKey = parseLocalProfilePhotoKey(photoURL)
     if (!localKey) {
       setPreviewSrc(resolveProfilePhoto(photoURL))
@@ -39,7 +49,7 @@ export function ProfileAvatarEditor({
     void getProfilePhotoObjectUrl(localKey).then((url) => {
       if (!active) return
       objectUrl = url
-      setPreviewSrc(url ?? resolveProfilePhoto(photoURL))
+      setPreviewSrc(url ?? getDefaultProfilePhoto())
     })
 
     return () => {
@@ -52,9 +62,6 @@ export function ProfileAvatarEditor({
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
-
-    const preview = URL.createObjectURL(file)
-    setPreviewSrc(preview)
     onSelectFile(file)
   }
 

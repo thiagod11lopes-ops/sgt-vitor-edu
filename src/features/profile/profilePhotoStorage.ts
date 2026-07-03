@@ -84,3 +84,45 @@ export async function deleteProfilePhotoFile(key: string): Promise<void> {
     /* ignore */
   }
 }
+
+const CACHE_MAX_EDGE = 512
+const CACHE_JPEG_QUALITY = 0.82
+
+/** Gera JPEG compacto para persistir em localStorage (sobrevive ao reload). */
+export async function compressImageForCache(file: File): Promise<string> {
+  if (typeof document === 'undefined') {
+    return URL.createObjectURL(file)
+  }
+
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, CACHE_MAX_EDGE / Math.max(bitmap.width, bitmap.height))
+  const width = Math.max(1, Math.round(bitmap.width * scale))
+  const height = Math.max(1, Math.round(bitmap.height * scale))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    bitmap.close()
+    throw new Error('Não foi possível processar a imagem.')
+  }
+
+  ctx.drawImage(bitmap, 0, 0, width, height)
+  bitmap.close()
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (result) => (result ? resolve(result) : reject(new Error('Falha ao comprimir imagem.'))),
+      'image/jpeg',
+      CACHE_JPEG_QUALITY,
+    )
+  })
+
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error ?? new Error('Falha ao ler imagem.'))
+    reader.readAsDataURL(blob)
+  })
+}

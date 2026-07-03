@@ -1,7 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Shield, LogIn, ArrowLeft } from 'lucide-react'
-import { loginAdmin, loginAdminWithGoogle } from '@/features/admin/adminAuthService'
+import {
+  loginAdmin,
+  loginAdminWithGoogle,
+  resolveAdminGoogleRedirectLogin,
+} from '@/features/admin/adminAuthService'
+import { hasPendingAdminGoogleRedirect } from '@/services/firebase/adminFirebaseAuth'
 import { Button } from '@/components/ui/Button'
 import { AdminShell } from '@/components/admin/AdminShell'
 import { AdminGoogleLoginButton } from '@/components/admin/AdminGoogleLoginButton'
@@ -12,6 +17,27 @@ export function AdminLoginPage() {
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(false)
+  const [redirecting, setRedirecting] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    if (hasPendingAdminGoogleRedirect()) setRedirecting(true)
+
+    void (async () => {
+      const result = await resolveAdminGoogleRedirectLogin('system')
+      if (cancelled) return
+      setRedirecting(false)
+      if (!result) return
+      if (result.ok) {
+        navigate('/admin', { replace: true })
+      } else if (result.error) {
+        setError(result.error)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -24,6 +50,16 @@ export function AdminLoginPage() {
       setError('Senha incorreta. Use sgtvitor2024 (padrão) ou a senha definida no deploy.')
     }
     setLoading(false)
+  }
+
+  if (redirecting) {
+    return (
+      <AdminShell>
+        <div className="min-h-dvh flex items-center justify-center p-4">
+          <p className="text-sm text-text-muted">Concluindo login com Google…</p>
+        </div>
+      </AdminShell>
+    )
   }
 
   return (
@@ -59,6 +95,10 @@ export function AdminLoginPage() {
             disabled={loading}
             onLogin={async () => {
               const result = await loginAdminWithGoogle()
+              if (result.redirecting) {
+                setRedirecting(true)
+                return { ok: false }
+              }
               if (result.ok) navigate('/admin', { replace: true })
               return { ok: result.ok, error: result.error }
             }}

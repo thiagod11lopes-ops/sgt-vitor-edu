@@ -4,11 +4,13 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
   type ReactNode,
 } from 'react'
 import {
   onAuthChange,
   getUserProfile,
+  ensureUserProfile,
   signIn,
   signUp,
   signInWithGoogle,
@@ -18,9 +20,13 @@ import {
   getFreshDemoUser,
 } from '@/services/firebase/auth'
 import { isConfigured } from '@/services/firebase/config'
+import { resolveAuthUid } from '@/services/firebase/authHelpers'
 import { registerOrUpdateUser } from '@/features/admin/userRegistryService'
 import { resetDemoUserData } from '@/features/demo/demoDataService'
-import { uploadProfilePhoto } from '@/features/profile/profilePhotoService'
+import {
+  uploadProfilePhoto,
+  resolveProfilePhotoURL,
+} from '@/features/profile/profilePhotoService'
 import type { UserProfile } from '@/types'
 
 const SESSION_KEY = 'sgt-vitor-auth-session'
@@ -53,13 +59,25 @@ const AuthContext = createContext<AuthContextType>({
   updateProfilePhoto: async () => {},
 })
 
+function mergeProfilePhoto(
+  uid: string,
+  ...candidates: (string | undefined | null)[]
+): string | undefined {
+  return resolveProfilePhotoURL(uid, ...candidates)
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null)
+  const userRef = useRef<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isOnline, setIsOnline] = useState(
     typeof navigator !== 'undefined' ? navigator.onLine : true
   )
+
+  useEffect(() => {
+    userRef.current = user
+  }, [user])
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true)
@@ -73,11 +91,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const refreshProfile = useCallback(async () => {
-    if (user?.uid) {
-      const profile = await getUserProfile(user.uid)
-      if (profile) setUser(profile)
-    }
-  }, [user?.uid])
+    const uid = await resolveAuthUid(userRef.current?.uid)
+    if (!uid) return
+    const profile = await getUserProfile(uid)
+    if (!profile) return
+    setUser({
+      ...profile,
+      uid,
+      photoURL: mergeProfilePhoto(uid, profile.photoURL, userRef.current?.photoURL),
+    })
+  }, [])
 
   const trackUser = useCallback((profile: UserProfile) => {
     registerOrUpdateUser({
@@ -90,25 +113,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isConfigured) {
-      setUser(null)
-      setIsAuthenticated(false)
+      if (localStorage.getItem(SESSION_KEY) === 'demo') {
+        const demoUser = getFreshDemoUser()
+        setUser(demoUser)
+        setIsAuthenticated(true)
+        trackUser(demoUser)
+      } else {
+        setUser(null)
+        setIsAuthenticated(false)
+      }
       setLoading(false)
       return
     }
 
     const unsub = onAuthChange(async (firebaseUser) => {
       if (firebaseUser) {
-        const profile = await getUserProfile(firebaseUser.uid)
-        const base =
-          profile ?? {
-            ...DEMO_USER,
-            uid: firebaseUser.uid,
-            email: firebaseUser.email ?? '',
-            displayName: firebaseUser.displayName ?? DEMO_USER.displayName,
-          }
+        const profile = await ensureUserProfile(firebaseUser)
         const withPhoto = {
-          ...base,
-          photoURL: base.photoURL ?? firebaseUser.photoURL ?? undefined,
+          ...profile,
+          uid: firebaseUser.uid,
+          email: profile.email || firebaseUser.email || '',
+          displayName: profile.displayName || firebaseUser.displayName || DEMO_USER.displayName,
+          photoURL: mergeProfilePhoto(
+            firebaseUser.uid,
+            profile.photoURL,
+            firebaseUser.photoURL,
+          ),
         }
         setUser(withPhoto)
         setIsAuthenticated(true)
@@ -145,16 +175,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     trackUser(freshUser)
   }, [trackUser])
 
-  const updateProfilePhoto = useCallback(
-    async (file: File) => {
-      if (!user?.uid) throw new Error('Entre na sua conta para alterar a foto.')
+  const updateProfilePhoto = useCallback(async (file: File) => {
+    const uid = await resolveAuthUid(userRef.current?.uid)
+    if (!uid) throw new Error('Entre na sua conta para alterar a foto.')
 
-      const photoURL = await uploadProfilePhoto(user.uid, file, user.photoURL)
-      setUser({ ...user, photoURL })
-      if (isConfigured) await refreshProfile()
-    },
-    [user, refreshProfile],
-  )
+    const previousPhotoURL = userRef.current?.photoURL
+    const photoURL = await uploadProfilePhoto(uid, file, previousPhotoURL)
+    setUser((current) => {
+      const base = current ?? { ...DEMO_USER, uid }
+      return { ...base, uid, photoURL }
+    })
+  }, [])
 
   const loginWithGoogle = useCallback(async () => {
     if (!isConfigured) throw new Error('Configure o Firebase para login com Google.')

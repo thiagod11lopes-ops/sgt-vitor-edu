@@ -34,7 +34,7 @@ import { PLAN_PRICES } from '@/types'
 import { GOAL_OPTIONS, KNOWLEDGE_LEVEL_OPTIONS } from '@/features/onboarding/onboardingData'
 
 export function ProfilePage() {
-  const { user, updateProfilePhoto } = useAuthContext()
+  const { user, isAuthenticated, loading, updateProfilePhoto } = useAuthContext()
   const { plan, questionsUsed, isPremium } = useSubscription()
   const { referralCode, copied, copyLink, shareLink, stats } = useReferral()
   const { personalization, updatePersonalization } = usePersonalization()
@@ -58,6 +58,14 @@ export function ProfilePage() {
           uploading={photoUploading}
           error={photoError}
           onSelectFile={async (file) => {
+            if (loading) {
+              setPhotoError('Aguarde o login carregar…')
+              return
+            }
+            if (!isAuthenticated) {
+              setPhotoError('Entre na sua conta pelo botão Online/Offline acima.')
+              return
+            }
             setPhotoError('')
             setPhotoUploading(true)
             try {

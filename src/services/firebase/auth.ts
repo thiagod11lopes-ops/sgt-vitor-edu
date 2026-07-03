@@ -14,7 +14,7 @@ import { auth, db, isConfigured } from './config'
 import type { UserProfile } from '@/types'
 import { generateReferralCode } from '@/lib/utils'
 import { getDefaultProfilePhoto } from '@/lib/profileAssets'
-import { loadDemoPhotoURL } from '@/features/profile/profilePhotoService'
+import { loadDemoPhotoURL, resolveProfilePhotoURL } from '@/features/profile/profilePhotoService'
 
 const DEMO_USER: UserProfile = {
   uid: 'demo-user',
@@ -37,7 +37,9 @@ export function getFreshDemoUser(): UserProfile {
   const today = new Date().toISOString().split('T')[0]
   return {
     ...DEMO_USER,
-    photoURL: loadDemoPhotoURL(DEMO_USER.uid) ?? getDefaultProfilePhoto(),
+    photoURL:
+      resolveProfilePhotoURL(DEMO_USER.uid, loadDemoPhotoURL(DEMO_USER.uid)) ??
+      getDefaultProfilePhoto(),
     dailyQuestionsUsed: 0,
     dailyQuestionsReset: today,
     totalQuestions: 0,
@@ -99,10 +101,43 @@ export function onAuthChange(callback: (user: User | null) => void) {
   return onAuthStateChanged(auth, callback)
 }
 
+export async function ensureUserProfile(firebaseUser: User): Promise<UserProfile> {
+  const existing = await getUserProfile(firebaseUser.uid)
+  if (existing) return existing
+
+  const profile: UserProfile = {
+    uid: firebaseUser.uid,
+    displayName: firebaseUser.displayName ?? DEMO_USER.displayName,
+    email: firebaseUser.email ?? '',
+    photoURL: resolveProfilePhotoURL(
+      firebaseUser.uid,
+      loadDemoPhotoURL(firebaseUser.uid),
+      firebaseUser.photoURL,
+    ),
+    plan: 'free',
+    knowledgeLevel: 'iniciante',
+    referralCode: generateReferralCode(firebaseUser.displayName ?? 'user'),
+    dailyQuestionsUsed: 0,
+    dailyQuestionsReset: new Date().toISOString().split('T')[0],
+    totalQuestions: 0,
+    badges: ['primeiro_acesso'],
+    createdAt: new Date().toISOString(),
+  }
+
+  await updateUserProfile(firebaseUser.uid, profile)
+  return profile
+}
+
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   if (!db || !isConfigured) return { ...DEMO_USER, uid }
   const snap = await getDoc(doc(db, 'users', uid))
-  return snap.exists() ? (snap.data() as UserProfile) : null
+  if (!snap.exists()) return null
+  const data = snap.data() as UserProfile
+  return {
+    ...data,
+    uid,
+    photoURL: resolveProfilePhotoURL(uid, data.photoURL),
+  }
 }
 
 export async function updateUserProfile(uid: string, data: Partial<UserProfile>) {

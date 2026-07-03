@@ -4,10 +4,14 @@ import {
   signOut,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  type UserCredential,
 } from 'firebase/auth'
 import { adminAuth, STORE_ADMIN_EMAIL, SYSTEM_ADMIN_EMAIL } from './adminApp'
 import { isConfigured } from './config'
 import {
+  getAllowedGoogleEmails,
   isEmailAllowedForRole,
   loadAdminConfig,
   registerGoogleAdminEmail,
@@ -15,6 +19,9 @@ import {
 import { firebaseAuthErrorMessage } from './firebaseAuthErrors'
 
 export type AdminRole = 'system' | 'store'
+
+const REDIRECT_ROLE_KEY = 'sgt-vitor-admin-google-role'
+const REDIRECT_PENDING_KEY = 'sgt-vitor-admin-google-redirect'
 
 export interface AdminAuthResult {
   passwordOk: boolean
@@ -25,6 +32,7 @@ export interface AdminAuthResult {
 export interface AdminGoogleAuthResult {
   ok: boolean
   firebaseOk: boolean
+  redirecting?: boolean
   errorCode?: string
   errorMessage?: string
 }
@@ -51,6 +59,15 @@ function credentialsFor(role: AdminRole) {
 
 function firebaseErrorCode(error: unknown): string | undefined {
   return (error as { code?: string }).code
+}
+
+/** Safari/iOS bloqueiam pop-up do Google com frequência — usar redirect. */
+export function prefersGoogleRedirectAuth(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent
+  const isIOS = /iPad|iPhone|iPod/i.test(ua)
+  const isSafari = /Safari/i.test(ua) && !/Chrom(e|ium)|CriOS|FxiOS|EdgiOS/i.test(ua)
+  return isIOS || isSafari
 }
 
 async function signInOrCreateAdmin(email: string, password: string): Promise<AdminAuthResult> {
@@ -99,6 +116,100 @@ export async function ensureAdminFirebaseAuth(
   return signInOrCreateAdmin(email, validPassword)
 }
 
+async function processGoogleCredential(
+  role: AdminRole,
+  cred: UserCredential,
+): Promise<AdminGoogleAuthResult> {
+  if (!adminAuth) {
+    return {
+      ok: false,
+      firebaseOk: false,
+      errorMessage: 'Firebase não configurado neste ambiente.',
+    }
+  }
+
+  const email = cred.user.email
+  if (!email) {
+    await signOut(adminAuth)
+    return {
+      ok: false,
+      firebaseOk: false,
+      errorCode: 'auth/no-email',
+      errorMessage: 'Conta Google sem e-mail. Use outra conta.',
+    }
+  }
+
+  const config = await loadAdminConfig()
+  if (!isEmailAllowedForRole(role, email, config)) {
+    await signOut(adminAuth)
+    const allowed = getAllowedGoogleEmails(role)
+    const hint =
+      allowed.length > 0
+        ? `Use a conta Google autorizada (${allowed.join(', ')}).`
+        : 'Este e-mail não está na lista de administradores.'
+    return {
+      ok: false,
+      firebaseOk: false,
+      errorCode: 'auth/unauthorized-admin',
+      errorMessage: `Este Google não está autorizado para este painel. ${hint}`,
+    }
+  }
+
+  try {
+    await registerGoogleAdminEmail(role, email)
+  } catch (error: unknown) {
+    const code = firebaseErrorCode(error)
+    if (code === 'permission-denied') {
+      await signOut(adminAuth)
+      return {
+        ok: false,
+        firebaseOk: false,
+        errorCode: code,
+        errorMessage:
+          'Login Google ok, mas falhou ao registrar admin no Firestore. Tente novamente ou use a senha do admin.',
+      }
+    }
+    throw error
+  }
+
+  return { ok: true, firebaseOk: true }
+}
+
+export function hasPendingAdminGoogleRedirect(): boolean {
+  if (typeof sessionStorage === 'undefined') return false
+  return sessionStorage.getItem(REDIRECT_PENDING_KEY) === '1'
+}
+
+export async function completeAdminGoogleRedirect(
+  expectedRole: AdminRole,
+): Promise<AdminGoogleAuthResult | null> {
+  if (!isConfigured || !adminAuth) return null
+
+  let cred: UserCredential | null = null
+  try {
+    cred = await getRedirectResult(adminAuth)
+  } catch (error: unknown) {
+    const code = firebaseErrorCode(error)
+    return {
+      ok: false,
+      firebaseOk: false,
+      errorCode: code,
+      errorMessage:
+        adminFirebaseErrorMessage(code) ??
+        firebaseAuthErrorMessage(code) ??
+        'Falha ao concluir login com Google.',
+    }
+  }
+
+  if (!cred) return null
+
+  const storedRole = sessionStorage.getItem(REDIRECT_ROLE_KEY) as AdminRole | null
+  sessionStorage.removeItem(REDIRECT_PENDING_KEY)
+  sessionStorage.removeItem(REDIRECT_ROLE_KEY)
+
+  return processGoogleCredential(storedRole ?? expectedRole, cred)
+}
+
 export async function signInAdminWithGoogle(role: AdminRole): Promise<AdminGoogleAuthResult> {
   if (!isConfigured || !adminAuth) {
     return {
@@ -108,39 +219,32 @@ export async function signInAdminWithGoogle(role: AdminRole): Promise<AdminGoogl
     }
   }
 
+  const provider = new GoogleAuthProvider()
+  provider.setCustomParameters({ prompt: 'select_account' })
+
+  if (prefersGoogleRedirectAuth()) {
+    sessionStorage.setItem(REDIRECT_ROLE_KEY, role)
+    sessionStorage.setItem(REDIRECT_PENDING_KEY, '1')
+    await signInWithRedirect(adminAuth, provider)
+    return { ok: false, firebaseOk: false, redirecting: true }
+  }
+
   try {
-    const provider = new GoogleAuthProvider()
-    provider.setCustomParameters({ prompt: 'select_account' })
     const cred = await signInWithPopup(adminAuth, provider)
-    const email = cred.user.email
-
-    if (!email) {
-      await signOut(adminAuth)
-      return {
-        ok: false,
-        firebaseOk: false,
-        errorCode: 'auth/no-email',
-        errorMessage: 'Conta Google sem e-mail. Use outra conta.',
-      }
-    }
-
-    const config = await loadAdminConfig()
-    if (!isEmailAllowedForRole(role, email, config)) {
-      await signOut(adminAuth)
-      return {
-        ok: false,
-        firebaseOk: false,
-        errorCode: 'auth/unauthorized-admin',
-        errorMessage: 'Este Google não está autorizado para este painel.',
-      }
-    }
-
-    await registerGoogleAdminEmail(role, email)
-    return { ok: true, firebaseOk: true }
+    return processGoogleCredential(role, cred)
   } catch (error: unknown) {
     const code = firebaseErrorCode(error)
     if (code === 'auth/popup-closed-by-user') {
       return { ok: false, firebaseOk: false, errorCode: code }
+    }
+    if (
+      code === 'auth/popup-blocked' ||
+      code === 'auth/cancelled-popup-request'
+    ) {
+      sessionStorage.setItem(REDIRECT_ROLE_KEY, role)
+      sessionStorage.setItem(REDIRECT_PENDING_KEY, '1')
+      await signInWithRedirect(adminAuth, provider)
+      return { ok: false, firebaseOk: false, redirecting: true }
     }
     if (code === 'permission-denied') {
       return {

@@ -1,4 +1,5 @@
 import {
+  completeAdminGoogleRedirect,
   ensureAdminFirebaseAuth,
   signInAdminWithGoogle,
   adminFirebaseErrorMessage,
@@ -30,16 +31,33 @@ export async function loginStoreAdminWithGoogle(): Promise<{
   ok: boolean
   warning?: string
   error?: string
+  redirecting?: boolean
 }> {
   if (!isConfigured) {
     return { ok: false, error: 'Firebase não configurado.' }
   }
 
   const result = await signInAdminWithGoogle('store')
+  if (result.redirecting) {
+    return { ok: false, redirecting: true }
+  }
   if (!result.ok) {
     return { ok: false, error: result.errorMessage ?? 'Não foi possível entrar com Google.' }
   }
 
+  return completeLogin(result)
+}
+
+export async function resolveStoreAdminGoogleRedirectLogin(): Promise<{
+  ok: boolean
+  warning?: string
+  error?: string
+} | null> {
+  const result = await completeAdminGoogleRedirect('store')
+  if (!result) return null
+  if (!result.ok) {
+    return { ok: false, error: result.errorMessage ?? 'Não foi possível entrar com Google.' }
+  }
   return completeLogin(result)
 }
 

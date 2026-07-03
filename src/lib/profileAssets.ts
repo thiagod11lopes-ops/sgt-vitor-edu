@@ -5,6 +5,16 @@ export function getDefaultProfilePhoto(): string {
   return `${base}/${DEFAULT_PROFILE_PHOTO}`
 }
 
+export function isDefaultProfilePhoto(photoURL?: string): boolean {
+  if (!photoURL?.trim()) return true
+  const normalized = photoURL.toLowerCase()
+  return (
+    normalized.includes('instructor-glock.svg') ||
+    normalized.includes(DEFAULT_PROFILE_PHOTO) ||
+    normalized.endsWith('/profile/instructor-glock.svg')
+  )
+}
+
 import { isLocalProfilePhotoUrl } from '@/features/profile/profilePhotoStorage'
 
 export function resolveProfilePhoto(photoURL?: string): string {
