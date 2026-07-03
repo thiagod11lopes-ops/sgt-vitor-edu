@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Shield, ArrowLeft } from 'lucide-react'
-import { loginAdminWithGoogle, resolveAdminGoogleRedirectLogin } from '@/features/admin/adminAuthService'
+import {
+  loginAdminWithGoogle,
+  resolveAdminGoogleRedirectLogin,
+  syncAdminSessionFromFirebase,
+} from '@/features/admin/adminAuthService'
 import { hasPendingAdminGoogleRedirect } from '@/services/firebase/adminFirebaseAuth'
 import { isConfigured } from '@/services/firebase/config'
 import { AdminShell } from '@/components/admin/AdminShell'
@@ -11,32 +15,43 @@ export function AdminLoginPage() {
   const [error, setError] = useState('')
   const navigate = useNavigate()
   const [redirecting, setRedirecting] = useState(false)
+  const [checking, setChecking] = useState(true)
 
   useEffect(() => {
     let cancelled = false
     if (hasPendingAdminGoogleRedirect()) setRedirecting(true)
 
     void (async () => {
-      const result = await resolveAdminGoogleRedirectLogin('system')
+      const redirectResult = await resolveAdminGoogleRedirectLogin('system')
       if (cancelled) return
-      setRedirecting(false)
-      if (!result) return
-      if (result.ok) {
+
+      if (redirectResult?.ok) {
         navigate('/admin', { replace: true })
-      } else if (result.error) {
-        setError(result.error)
+        return
       }
+
+      if (await syncAdminSessionFromFirebase('system')) {
+        navigate('/admin', { replace: true })
+        return
+      }
+
+      setRedirecting(false)
+      setChecking(false)
+      if (redirectResult?.error) setError(redirectResult.error)
     })()
+
     return () => {
       cancelled = true
     }
   }, [navigate])
 
-  if (redirecting) {
+  if (redirecting || checking) {
     return (
       <AdminShell>
         <div className="min-h-dvh flex items-center justify-center p-4">
-          <p className="text-sm text-text-muted">Concluindo login com Google…</p>
+          <p className="text-sm text-text-muted">
+            {redirecting ? 'Concluindo login com Google…' : 'Verificando sessão…'}
+          </p>
         </div>
       </AdminShell>
     )
@@ -66,8 +81,11 @@ export function AdminLoginPage() {
                   setRedirecting(true)
                   return { ok: false }
                 }
-                if (result.ok) navigate('/admin', { replace: true })
-                if (result.error) setError(result.error)
+                if (result.ok) {
+                  navigate('/admin', { replace: true })
+                } else if (result.error) {
+                  setError(result.error)
+                }
                 return { ok: result.ok, error: result.error }
               }}
             />

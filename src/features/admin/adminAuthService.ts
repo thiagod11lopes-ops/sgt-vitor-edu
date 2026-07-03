@@ -4,6 +4,7 @@ import {
   signInAdminWithGoogle,
   adminFirebaseErrorMessage,
   signOutAdminFirebase,
+  isAdminFirebaseReady,
   type AdminRole,
 } from '@/services/firebase/adminFirebaseAuth'
 import { isConfigured } from '@/services/firebase/config'
@@ -18,11 +19,9 @@ async function completeLogin(result: { firebaseOk: boolean; errorCode?: string }
   if (result.firebaseOk) {
     localStorage.removeItem(ADMIN_FIREBASE_WARN_KEY)
     if (adminDb) {
-      try {
-        await seedFirestoreContent(adminDb)
-      } catch {
+      void seedFirestoreContent(adminDb).catch(() => {
         /* seed opcional — não bloqueia login */
-      }
+      })
     }
     return { ok: true as const }
   }
@@ -56,6 +55,15 @@ export async function loginAdminWithGoogle(): Promise<{
   }
 
   return completeLogin(result)
+}
+
+export async function syncAdminSessionFromFirebase(role: AdminRole = 'system'): Promise<boolean> {
+  if (isAdminSessionActive()) return true
+  const ready = await isAdminFirebaseReady(role)
+  if (!ready) return false
+  localStorage.setItem(ADMIN_SESSION_KEY, '1')
+  localStorage.removeItem(ADMIN_FIREBASE_WARN_KEY)
+  return true
 }
 
 export async function resolveAdminGoogleRedirectLogin(

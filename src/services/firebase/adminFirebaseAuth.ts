@@ -159,6 +159,13 @@ async function processGoogleCredential(
     await registerGoogleAdminEmail(role, email)
   } catch (error: unknown) {
     const code = firebaseErrorCode(error)
+    const normalized = email.trim().toLowerCase()
+    if (
+      code === 'permission-denied' &&
+      getAllowedGoogleEmails(role).includes(normalized)
+    ) {
+      return { ok: true, firebaseOk: true }
+    }
     if (code === 'permission-denied') {
       await signOut(adminAuth)
       return {
@@ -166,7 +173,7 @@ async function processGoogleCredential(
         firebaseOk: false,
         errorCode: code,
         errorMessage:
-          'Login Google ok, mas falhou ao registrar admin no Firestore. Tente novamente ou use a senha do admin.',
+          'Login Google ok, mas falhou ao registrar admin no Firestore. Tente novamente.',
       }
     }
     throw error
@@ -176,38 +183,45 @@ async function processGoogleCredential(
 }
 
 export function hasPendingAdminGoogleRedirect(): boolean {
-  if (typeof sessionStorage === 'undefined') return false
-  return sessionStorage.getItem(REDIRECT_PENDING_KEY) === '1'
+  if (typeof localStorage === 'undefined') return false
+  return localStorage.getItem(REDIRECT_PENDING_KEY) === '1'
 }
+
+let redirectFlowPromise: Promise<AdminGoogleAuthResult | null> | null = null
 
 export async function completeAdminGoogleRedirect(
   expectedRole: AdminRole,
 ): Promise<AdminGoogleAuthResult | null> {
   if (!isConfigured || !adminAuth) return null
 
-  let cred: UserCredential | null = null
-  try {
-    cred = await getRedirectResult(adminAuth)
-  } catch (error: unknown) {
-    const code = firebaseErrorCode(error)
-    return {
-      ok: false,
-      firebaseOk: false,
-      errorCode: code,
-      errorMessage:
-        adminFirebaseErrorMessage(code) ??
-        firebaseAuthErrorMessage(code) ??
-        'Falha ao concluir login com Google.',
-    }
+  if (!redirectFlowPromise) {
+    redirectFlowPromise = (async () => {
+      try {
+        await adminAuth.authStateReady()
+        const cred = await getRedirectResult(adminAuth)
+        if (!cred) return null
+
+        const storedRole = (localStorage.getItem(REDIRECT_ROLE_KEY) as AdminRole | null) ?? expectedRole
+        localStorage.removeItem(REDIRECT_PENDING_KEY)
+        localStorage.removeItem(REDIRECT_ROLE_KEY)
+
+        return processGoogleCredential(storedRole, cred)
+      } catch (error: unknown) {
+        const code = firebaseErrorCode(error)
+        return {
+          ok: false,
+          firebaseOk: false,
+          errorCode: code,
+          errorMessage:
+            adminFirebaseErrorMessage(code) ??
+            firebaseAuthErrorMessage(code) ??
+            'Falha ao concluir login com Google.',
+        }
+      }
+    })()
   }
 
-  if (!cred) return null
-
-  const storedRole = sessionStorage.getItem(REDIRECT_ROLE_KEY) as AdminRole | null
-  sessionStorage.removeItem(REDIRECT_PENDING_KEY)
-  sessionStorage.removeItem(REDIRECT_ROLE_KEY)
-
-  return processGoogleCredential(storedRole ?? expectedRole, cred)
+  return redirectFlowPromise
 }
 
 export async function signInAdminWithGoogle(role: AdminRole): Promise<AdminGoogleAuthResult> {
@@ -223,8 +237,8 @@ export async function signInAdminWithGoogle(role: AdminRole): Promise<AdminGoogl
   provider.setCustomParameters({ prompt: 'select_account' })
 
   if (prefersGoogleRedirectAuth()) {
-    sessionStorage.setItem(REDIRECT_ROLE_KEY, role)
-    sessionStorage.setItem(REDIRECT_PENDING_KEY, '1')
+    localStorage.setItem(REDIRECT_ROLE_KEY, role)
+    localStorage.setItem(REDIRECT_PENDING_KEY, '1')
     await signInWithRedirect(adminAuth, provider)
     return { ok: false, firebaseOk: false, redirecting: true }
   }
@@ -241,8 +255,8 @@ export async function signInAdminWithGoogle(role: AdminRole): Promise<AdminGoogl
       code === 'auth/popup-blocked' ||
       code === 'auth/cancelled-popup-request'
     ) {
-      sessionStorage.setItem(REDIRECT_ROLE_KEY, role)
-      sessionStorage.setItem(REDIRECT_PENDING_KEY, '1')
+      localStorage.setItem(REDIRECT_ROLE_KEY, role)
+      localStorage.setItem(REDIRECT_PENDING_KEY, '1')
       await signInWithRedirect(adminAuth, provider)
       return { ok: false, firebaseOk: false, redirecting: true }
     }
@@ -283,11 +297,16 @@ export async function signOutAdminFirebase() {
 }
 
 export async function isAdminFirebaseReady(role: AdminRole): Promise<boolean> {
-  if (!isConfigured || !adminAuth?.currentUser?.email) return false
+  if (!isConfigured || !adminAuth) return false
+
+  await adminAuth.authStateReady()
+  if (!adminAuth.currentUser?.email) return false
 
   const email = adminAuth.currentUser.email.toLowerCase()
   if (role === 'system' && email === SYSTEM_ADMIN_EMAIL) return true
   if (role === 'store' && email === STORE_ADMIN_EMAIL) return true
+
+  if (getAllowedGoogleEmails(role).includes(email)) return true
 
   const config = await loadAdminConfig()
   const list = role === 'system' ? config.systemGoogleEmails : config.storeGoogleEmails
