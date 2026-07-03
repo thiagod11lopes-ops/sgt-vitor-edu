@@ -3,6 +3,7 @@ import { DOCUMENTS as DEFAULT_DOCUMENTS } from '@/features/library/libraryData'
 import { deletePdfFile, parseLocalPdfKey } from '@/features/admin/pdfStorageService'
 import { COLLECTIONS } from '@/services/firebase/collections'
 import { adminDb, isConfigured, removeDoc, upsertDoc } from '@/services/firebase/firestoreHelpers'
+import { adminAuth } from '@/services/firebase/adminApp'
 import { initFirestoreData, subscribeDocuments, subscribeVideos } from '@/services/firebase/firestoreInit'
 import type { Video, Document } from '@/types'
 
@@ -104,12 +105,36 @@ function saveVideosLocal(videos: Video[]) {
   notifyUpdate()
 }
 
+function requireAdminFirebaseAuth(action: string) {
+  if (!adminAuth?.currentUser) {
+    throw new Error(
+      `Para ${action}, entre com Google no admin ou reconecte o Firebase (senha sozinha não grava no banco).`,
+    )
+  }
+}
+
+function firebaseWriteError(error: unknown, action: string): Error {
+  const code = (error as { code?: string }).code
+  if (code === 'permission-denied') {
+    return new Error(
+      `Sem permissão para ${action}. Saia do admin, entre com Google (${import.meta.env.VITE_SYSTEM_ADMIN_GOOGLE_EMAILS?.split(',')[0] ?? 'conta autorizada'}) e tente de novo.`,
+    )
+  }
+  if (error instanceof Error) return error
+  return new Error(`Não foi possível ${action} no Firebase.`)
+}
+
 export async function addVideo(video: Omit<Video, 'id'>) {
   const id = `v-${Date.now()}`
   const item = { ...video, id }
 
   if (isConfigured && adminDb) {
-    await upsertDoc(adminDb, COLLECTIONS.videos, id, item)
+    requireAdminFirebaseAuth('adicionar vídeos')
+    try {
+      await upsertDoc(adminDb, COLLECTIONS.videos, id, item)
+    } catch (error) {
+      throw firebaseWriteError(error, 'adicionar vídeos')
+    }
     return id
   }
 
@@ -124,7 +149,12 @@ export async function updateVideo(id: string, data: Partial<Video>) {
   const updated = { ...current, ...data }
 
   if (isConfigured && adminDb) {
-    await upsertDoc(adminDb, COLLECTIONS.videos, id, updated)
+    requireAdminFirebaseAuth('editar vídeos')
+    try {
+      await upsertDoc(adminDb, COLLECTIONS.videos, id, updated)
+    } catch (error) {
+      throw firebaseWriteError(error, 'editar vídeos')
+    }
     return
   }
 
@@ -133,7 +163,14 @@ export async function updateVideo(id: string, data: Partial<Video>) {
 
 export async function deleteVideo(id: string) {
   if (isConfigured && adminDb) {
-    await removeDoc(adminDb, COLLECTIONS.videos, id)
+    requireAdminFirebaseAuth('excluir vídeos')
+    try {
+      await removeDoc(adminDb, COLLECTIONS.videos, id)
+    } catch {
+      throw new Error('Não foi possível excluir o vídeo. Verifique sua conexão com o Firebase.')
+    }
+    videosCache = videosCache.filter((v) => v.id !== id)
+    notifyUpdate()
     return
   }
 
@@ -192,7 +229,14 @@ export async function deleteDocument(id: string) {
   if (pdfKey) void deletePdfFile(pdfKey)
 
   if (isConfigured && adminDb) {
-    await removeDoc(adminDb, COLLECTIONS.documents, id)
+    requireAdminFirebaseAuth('excluir documentos')
+    try {
+      await removeDoc(adminDb, COLLECTIONS.documents, id)
+    } catch {
+      throw new Error('Não foi possível excluir o documento. Verifique sua conexão com o Firebase.')
+    }
+    documentsCache = documentsCache.filter((d) => d.id !== id)
+    notifyUpdate()
     return
   }
 

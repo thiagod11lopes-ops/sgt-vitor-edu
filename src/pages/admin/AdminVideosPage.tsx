@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, Trash2, Pencil, Play, ExternalLink } from 'lucide-react'
 import {
   getVideos,
@@ -8,6 +8,7 @@ import {
   parseYoutubeId,
   parseInstagramEmbedUrl,
   youtubeThumbnail,
+  CONTENT_UPDATED_EVENT,
 } from '@/features/admin/contentService'
 import { PLAYLIST_LABELS } from '@/features/videos/videoData'
 import { Button } from '@/components/ui/Button'
@@ -29,8 +30,14 @@ export function AdminVideosPage() {
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [linkError, setLinkError] = useState('')
+  const [deleteError, setDeleteError] = useState('')
 
   const refresh = () => setVideos(getVideos())
+
+  useEffect(() => {
+    window.addEventListener(CONTENT_UPDATED_EVENT, refresh)
+    return () => window.removeEventListener(CONTENT_UPDATED_EVENT, refresh)
+  }, [])
 
   const handleSave = async () => {
     if (!form.title.trim()) return
@@ -68,8 +75,12 @@ export function AdminVideosPage() {
       setForm(emptyForm)
       setEditingId(null)
       refresh()
-    } catch {
-      setLinkError('Erro ao salvar no Firebase. Faça login no admin e verifique Authentication.')
+    } catch (error) {
+      setLinkError(
+        error instanceof Error
+          ? error.message
+          : 'Erro ao salvar no Firebase. Faça login no admin e verifique Authentication.',
+      )
     }
   }
 
@@ -86,9 +97,22 @@ export function AdminVideosPage() {
     })
   }
 
-  const handleDelete = (id: string) => {
-    if (confirm('Remover este vídeo?')) {
-      void deleteVideo(id).then(refresh)
+  const handleDelete = async (id: string) => {
+    if (!confirm('Remover este vídeo?')) return
+    setDeleteError('')
+    try {
+      await deleteVideo(id)
+      if (editingId === id) {
+        setEditingId(null)
+        setForm(emptyForm)
+      }
+      refresh()
+    } catch (error) {
+      setDeleteError(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível excluir. Tente entrar com Google no admin.',
+      )
     }
   }
 
@@ -180,6 +204,12 @@ export function AdminVideosPage() {
           )}
         </div>
       </div>
+
+      {deleteError && (
+        <p className="text-xs text-red-400 mb-4 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
+          {deleteError}
+        </p>
+      )}
 
       <div className="space-y-2">
         {videos.map((v) => (

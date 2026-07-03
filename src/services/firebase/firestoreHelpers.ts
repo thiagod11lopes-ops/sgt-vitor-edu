@@ -36,7 +36,7 @@ export async function seedCollection<T extends { id: string }>(
 
   const batch = writeBatch(firestore)
   for (const item of items) {
-    batch.set(doc(firestore, name, item.id), item as DocumentData)
+    batch.set(doc(firestore, name, item.id), withoutUndefined(item as DocumentData))
   }
   await batch.commit()
 }
@@ -44,17 +44,19 @@ export async function seedCollection<T extends { id: string }>(
 export function subscribeCollection<T>(
   firestore: Firestore,
   name: string,
-  defaults: T[],
+  _defaults: T[],
   mapDoc: (data: DocumentData, id: string) => T,
   onData: (items: T[]) => void,
 ) {
   return onSnapshot(collection(firestore, name), (snap) => {
-    if (snap.empty) {
-      onData(defaults)
-      return
-    }
     onData(snap.docs.map((d) => mapDoc(d.data(), d.id)))
   })
+}
+
+function withoutUndefined(data: DocumentData): DocumentData {
+  return Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined),
+  )
 }
 
 export async function upsertDoc(
@@ -63,7 +65,7 @@ export async function upsertDoc(
   id: string,
   data: DocumentData,
 ) {
-  await setDoc(doc(firestore, collectionName, id), data, { merge: true })
+  await setDoc(doc(firestore, collectionName, id), withoutUndefined(data), { merge: true })
 }
 
 export async function removeDoc(firestore: Firestore, collectionName: string, id: string) {

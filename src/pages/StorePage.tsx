@@ -18,6 +18,7 @@ import {
 import { StoreOrderPanel } from '@/components/store/StoreOrderPanel'
 import { StoreBuyerFormModal } from '@/components/store/StoreBuyerFormModal'
 import type { StoreBuyerData } from '@/features/store/storeBuyerTypes'
+import { resolveStoreImage } from '@/lib/storeAssets'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 
@@ -146,7 +147,7 @@ export function StorePage() {
             >
               <div className="aspect-square bg-gradient-to-br from-zinc-900 via-black to-zinc-900 flex items-center justify-center relative overflow-hidden">
                 <img
-                  src={product.image}
+                  src={resolveStoreImage(product.image)}
                   alt={product.name}
                   className="w-full h-full object-contain p-3 drop-shadow-lg"
                 />
@@ -209,7 +210,7 @@ export function StorePage() {
             >
               <div className="aspect-video glass rounded-2xl flex items-center justify-center mb-4 overflow-hidden bg-gradient-to-br from-zinc-900 to-black">
                 <img
-                  src={selected.image}
+                  src={resolveStoreImage(selected.image)}
                   alt={selected.name}
                   className="w-full h-full object-contain p-6 drop-shadow-xl"
                 />

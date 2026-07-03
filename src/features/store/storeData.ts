@@ -23,7 +23,7 @@ export const STORE_PRODUCTS: StoreProduct[] = [
     price: 4890.0,
     brand: 'Taurus',
     caliber: '.357 Magnum',
-    image: '/store/revolver.png',
+    image: '/store/revolver.svg',
     inStock: true,
     badge: 'Mais vendido',
   },
@@ -35,7 +35,7 @@ export const STORE_PRODUCTS: StoreProduct[] = [
     price: 3200.0,
     brand: 'Glock',
     caliber: '9mm',
-    image: '/store/glock.png',
+    image: '/store/glock.svg',
     inStock: true,
   },
   {
@@ -46,7 +46,7 @@ export const STORE_PRODUCTS: StoreProduct[] = [
     price: 2100.0,
     brand: 'Taurus',
     caliber: '9mm',
-    image: '/store/taurus-g2c.png',
+    image: '/store/taurus-g2c.svg',
     inStock: true,
   },
   {
@@ -57,7 +57,7 @@ export const STORE_PRODUCTS: StoreProduct[] = [
     price: 189.9,
     brand: 'CBC',
     caliber: 'Ogival',
-    image: '/store/municao-cbc.png',
+    image: '/store/municao-cbc.svg',
     inStock: true,
   },
   {
@@ -67,7 +67,7 @@ export const STORE_PRODUCTS: StoreProduct[] = [
     category: 'acessorios',
     price: 149.9,
     brand: 'Invictus',
-    image: '/store/coldre.png',
+    image: '/store/coldre.svg',
     inStock: true,
   },
   {
@@ -77,7 +77,7 @@ export const STORE_PRODUCTS: StoreProduct[] = [
     category: 'acessorios',
     price: 399.0,
     brand: 'Victoptics',
-    image: '/store/mira-red-dot.png',
+    image: '/store/mira-red-dot.svg',
     inStock: true,
   },
 ]

@@ -42,12 +42,16 @@ service cloud.firestore {
 
     match /config/admins {
       allow read: if request.auth != null;
-      allow create, update: if request.auth != null
-        && request.auth.token.firebase.sign_in_provider == 'google.com'
-        && (
-          request.auth.token.email in request.resource.data.systemGoogleEmails
-          || request.auth.token.email in request.resource.data.storeGoogleEmails
-        );
+      allow create, update: if request.auth != null && (
+        request.auth.token.email == 'system-admin@sgt-vitor-edu.app'
+        || (
+          request.auth.token.firebase.sign_in_provider == 'google.com'
+          && (
+            request.auth.token.email in request.resource.data.systemGoogleEmails
+            || request.auth.token.email in request.resource.data.storeGoogleEmails
+          )
+        )
+      );
     }
 
     match /users/{userId} {

@@ -12,6 +12,7 @@ import {
   loadAdminConfig,
   registerGoogleAdminEmail,
 } from './adminConfig'
+import { firebaseAuthErrorMessage } from './firebaseAuthErrors'
 
 export type AdminRole = 'system' | 'store'
 
@@ -141,33 +142,36 @@ export async function signInAdminWithGoogle(role: AdminRole): Promise<AdminGoogl
     if (code === 'auth/popup-closed-by-user') {
       return { ok: false, firebaseOk: false, errorCode: code }
     }
+    if (code === 'permission-denied') {
+      return {
+        ok: false,
+        firebaseOk: false,
+        errorCode: code,
+        errorMessage:
+          'Login Google ok, mas falhou ao registrar admin no Firestore. Tente novamente ou use a senha do admin.',
+      }
+    }
     return {
       ok: false,
       firebaseOk: false,
       errorCode: code,
-      errorMessage: adminFirebaseErrorMessage(code) ?? 'Falha ao entrar com Google.',
+      errorMessage:
+        adminFirebaseErrorMessage(code) ??
+        firebaseAuthErrorMessage(code) ??
+        'Falha ao entrar com Google.',
     }
   }
 }
 
 export function adminFirebaseErrorMessage(code?: string): string | null {
   if (!code) return null
-  if (code === 'auth/operation-not-allowed') {
-    return 'Ative "Google" e "E-mail/senha" em Firebase → Authentication → Sign-in method.'
-  }
   if (code === 'auth/unauthorized-admin') {
     return 'Este e-mail Google não está autorizado para este painel.'
   }
   if (code === 'auth/wrong-password-in-firebase') {
     return 'Senha correta no app, mas a conta Firebase está diferente. Exclua o usuário admin no Firebase Console e entre de novo.'
   }
-  if (code === 'auth/too-many-requests') {
-    return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'
-  }
-  if (code === 'auth/popup-blocked') {
-    return 'Pop-up bloqueado. Permita pop-ups para este site e tente novamente.'
-  }
-  return `Firebase: ${code.replace('auth/', '')}`
+  return firebaseAuthErrorMessage(code)
 }
 
 export async function signOutAdminFirebase() {

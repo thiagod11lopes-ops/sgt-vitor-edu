@@ -10,6 +10,7 @@ import { CATEGORY_LABELS, CATEGORY_ICONS } from '@/features/store/storeData'
 import type { StoreCategory, StoreProduct } from '@/features/store/storeTypes'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { resolveStoreImage } from '@/lib/storeAssets'
 
 const emptyProduct = {
   name: '',
@@ -18,7 +19,7 @@ const emptyProduct = {
   price: 0,
   brand: '',
   caliber: '',
-  image: '/store/revolver.png',
+  image: '/store/revolver.svg',
   inStock: true,
   badge: '',
 }
@@ -105,7 +106,7 @@ export function StoreAdminProductsPage() {
           <input
             value={form.image}
             onChange={(e) => setForm({ ...form, image: e.target.value })}
-            placeholder="URL da foto (ex: /store/produto.png)"
+            placeholder="URL da foto (ex: /store/revolver.svg)"
             className="md:col-span-2 glass rounded-xl px-3 py-2 text-sm outline-none"
           />
           <input
@@ -149,7 +150,7 @@ export function StoreAdminProductsPage() {
       <div className="space-y-2">
         {products.map((p) => (
           <div key={p.id} className="glass rounded-xl p-3 flex gap-3 border border-white/5">
-            <img src={p.image} alt="" className="w-16 h-16 rounded-lg object-contain bg-black/40 p-1" />
+            <img src={resolveStoreImage(p.image)} alt="" className="w-16 h-16 rounded-lg object-contain bg-black/40 p-1" />
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold">{p.name}</p>
               <p className="text-[10px] text-text-muted">R$ {p.price.toFixed(2)} · {p.brand}</p>

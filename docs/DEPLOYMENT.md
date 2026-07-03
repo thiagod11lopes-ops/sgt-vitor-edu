@@ -68,7 +68,11 @@ Workflow: `.github/workflows/firebase-rules.yml` (dispara ao alterar `firestore.
 
 1. Crie um projeto em [Firebase Console](https://console.firebase.google.com)
 2. Ative **Authentication**, **Firestore** e **Storage**
-3. Copie as credenciais web para os secrets do GitHub acima
+3. Em **Authentication → Sign-in method**, ative **Google**, **E-mail/senha** e **Anônimo** (se usar demo/loja)
+4. Em **Authentication → Settings → Authorized domains**, adicione:
+   - `thiagod11lopes-ops.github.io` (GitHub Pages — obrigatório para login Google online)
+   - `localhost` (já vem por padrão; necessário para dev local)
+5. Copie as credenciais web para os secrets do GitHub acima
 4. Publique as regras localmente (primeira vez) ou via workflow:
 
 ```bash

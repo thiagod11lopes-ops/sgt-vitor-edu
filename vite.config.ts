@@ -14,7 +14,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'revolver.png', 'store/**/*'],
+      includeAssets: ['favicon.svg', 'store/**/*'],
       manifest: {
         name: 'Sgt Vitor — Legislação & Treinamento',
         short_name: 'Sgt Vitor',

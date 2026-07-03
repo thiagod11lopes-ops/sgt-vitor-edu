@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="#1a1a22"/>
+      <stop offset="100%" stop-color="#050508"/>
+    </radialGradient>
+    <linearGradient id="kydex" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2a3038"/>
+      <stop offset="50%" stop-color="#1a1e24"/>
+      <stop offset="100%" stop-color="#0c0e12"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg)"/>
+  <ellipse cx="200" cy="318" rx="90" ry="14" fill="#000" opacity="0.35"/>
+  <g transform="translate(118 108)">
+    <path d="M72 0 C120 0 155 35 155 88 L155 195 C155 210 142 220 125 220 L45 220 C28 220 15 210 15 195 L15 88 C15 35 50 0 72 0 Z" fill="url(#kydex)" stroke="#3a424c" stroke-width="2"/>
+    <path d="M55 28 C85 18 115 28 125 55 L125 175 C115 195 85 205 55 195 Z" fill="#111418" opacity="0.6"/>
+    <rect x="148" y="95" width="28" height="48" rx="6" fill="#2a3038" stroke="#4a525c"/>
+    <circle cx="162" cy="108" r="5" fill="#5a626c"/>
+    <circle cx="162" cy="130" r="5" fill="#5a626c"/>
+    <rect x="55" y="235" width="70" height="18" rx="4" fill="#1a1e24" stroke="#3a424c"/>
+  </g>
+  <text x="200" y="372" text-anchor="middle" fill="#d4a574" font-family="system-ui,sans-serif" font-size="11" font-weight="600" letter-spacing="2">DEMONSTRA��O</text>
+</svg>
