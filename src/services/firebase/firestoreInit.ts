@@ -1,7 +1,6 @@
 import { doc, getDoc, setDoc, onSnapshot, collection, getDocs, writeBatch, type Firestore } from 'firebase/firestore'
 import { COLLECTIONS, LOCAL_STORAGE_KEYS } from './collections'
 import { db, isConfigured, seedCollection, subscribeCollection } from './firestoreHelpers'
-import { VIDEOS as DEFAULT_VIDEOS } from '@/features/videos/videoData'
 import { DOCUMENTS as DEFAULT_DOCUMENTS } from '@/features/library/libraryData'
 import { STORE_PRODUCTS } from '@/features/store/storeData'
 import type { Video, Document, ConsultingSession, RegisteredUserRecord } from '@/types'
@@ -11,7 +10,6 @@ let initialized = false
 
 export async function seedFirestoreContent(firestore: Firestore) {
   await Promise.all([
-    seedCollection(firestore, COLLECTIONS.videos, DEFAULT_VIDEOS, LOCAL_STORAGE_KEYS.videos),
     seedCollection(firestore, COLLECTIONS.documents, DEFAULT_DOCUMENTS, LOCAL_STORAGE_KEYS.documents),
     seedCollection(firestore, COLLECTIONS.storeProducts, STORE_PRODUCTS, LOCAL_STORAGE_KEYS.storeProducts),
   ])
@@ -102,7 +100,7 @@ export function subscribeVideos(onData: (videos: Video[]) => void) {
   return subscribeCollection(
     db,
     COLLECTIONS.videos,
-    DEFAULT_VIDEOS,
+    [],
     (data, id) => ({ ...data, id } as Video),
     (items) => onData(sortVideos(items)),
   )

@@ -34,6 +34,8 @@ export async function seedCollection<T extends { id: string }>(
     }
   }
 
+  if (items.length === 0) return
+
   const batch = writeBatch(firestore)
   for (const item of items) {
     batch.set(doc(firestore, name, item.id), withoutUndefined(item as DocumentData))

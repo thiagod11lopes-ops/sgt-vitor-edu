@@ -1,4 +1,3 @@
-import { VIDEOS as DEFAULT_VIDEOS } from '@/features/videos/videoData'
 import { DOCUMENTS as DEFAULT_DOCUMENTS } from '@/features/library/libraryData'
 import { deletePdfFile, parseLocalPdfKey } from '@/features/admin/pdfStorageService'
 import { COLLECTIONS } from '@/services/firebase/collections'
@@ -11,7 +10,7 @@ const VIDEOS_KEY = 'sgt-vitor-videos'
 const DOCS_KEY = 'sgt-vitor-documents'
 export const CONTENT_UPDATED_EVENT = 'sgt-content-updated'
 
-let videosCache: Video[] = DEFAULT_VIDEOS
+let videosCache: Video[] = []
 let documentsCache: Document[] = DEFAULT_DOCUMENTS
 let subscriptionsStarted = false
 let initPromise: Promise<void> | null = null
@@ -112,9 +111,9 @@ export function getVideos(): Video[] {
   if (!isConfigured) {
     try {
       const raw = localStorage.getItem(VIDEOS_KEY)
-      return raw ? JSON.parse(raw) : DEFAULT_VIDEOS
+      return raw ? JSON.parse(raw) : []
     } catch {
-      return DEFAULT_VIDEOS
+      return []
     }
   }
   return videosCache

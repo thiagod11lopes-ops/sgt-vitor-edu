@@ -120,7 +120,9 @@ export function VideosPage() {
 
         {!loading && filtered.length === 0 && (
           <p className="text-xs text-text-muted text-center py-8">
-            Nenhum vídeo disponível nesta categoria.
+            {playlist === 'all'
+              ? 'Nenhum vídeo cadastrado ainda.'
+              : 'Nenhum vídeo nesta categoria.'}
           </p>
         )}
 
