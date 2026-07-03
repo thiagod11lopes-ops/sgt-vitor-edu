@@ -5,6 +5,7 @@ import {
   adminFirebaseErrorMessage,
   signOutAdminFirebase,
   isAdminFirebaseReady,
+  hasPendingAdminGoogleRedirect,
   type AdminRole,
 } from '@/services/firebase/adminFirebaseAuth'
 import { isConfigured } from '@/services/firebase/config'
@@ -90,6 +91,8 @@ export async function logoutAdmin() {
 export function isAdminSessionActive(): boolean {
   return localStorage.getItem(ADMIN_SESSION_KEY) === '1'
 }
+
+export { hasPendingAdminGoogleRedirect }
 
 export function isAdminUser(role?: string): boolean {
   return role === 'admin'

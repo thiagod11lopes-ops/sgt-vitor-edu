@@ -4,6 +4,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { PersonalizationProvider } from '@/contexts/PersonalizationContext'
 import { OCRProvider } from '@/contexts/OCRContext'
 import { AppRoutes } from '@/routing/AppRoutes'
+import { AppAdminRedirectGate } from '@/components/admin/AppAdminRedirectGate'
 import { waitForVideosReady } from '@/features/admin/contentService'
 import { isConfigured } from '@/services/firebase/config'
 
@@ -23,7 +24,9 @@ export default function App() {
       <PersonalizationProvider>
         <OCRProvider>
           <BrowserRouter basename={routerBasename || undefined}>
-            <AppRoutes />
+            <AppAdminRedirectGate>
+              <AppRoutes />
+            </AppAdminRedirectGate>
           </BrowserRouter>
         </OCRProvider>
       </PersonalizationProvider>

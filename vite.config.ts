@@ -24,12 +24,23 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'portrait',
         start_url: base,
+        scope: base,
+        id: `${base}manifest`,
         icons: [
           {
             src: `${base}favicon.svg`,
             sizes: '512x512',
             type: 'image/svg+xml',
             purpose: 'any maskable',
+          },
+        ],
+        shortcuts: [
+          {
+            name: 'Painel Admin',
+            short_name: 'Admin',
+            description: 'Acesso ao painel administrativo',
+            url: `${base}admin/login`,
+            icons: [{ src: `${base}favicon.svg`, sizes: '512x512', type: 'image/svg+xml' }],
           },
         ],
       },
