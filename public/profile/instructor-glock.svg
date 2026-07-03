@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="35%" r="75%">
+      <stop offset="0%" stop-color="#1e2430"/>
+      <stop offset="100%" stop-color="#07080c"/>
+    </radialGradient>
+    <linearGradient id="skin" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c9956a"/>
+      <stop offset="100%" stop-color="#8b5e3c"/>
+    </linearGradient>
+    <linearGradient id="shirt" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2a3340"/>
+      <stop offset="100%" stop-color="#151a22"/>
+    </linearGradient>
+    <linearGradient id="metal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5a6068"/>
+      <stop offset="100%" stop-color="#1a1e24"/>
+    </linearGradient>
+    <clipPath id="circle">
+      <circle cx="200" cy="200" r="200"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#circle)">
+    <rect width="400" height="400" fill="url(#bg)"/>
+
+    <!-- Ombros / camisa -->
+    <path d="M40 360 C80 290 120 260 200 250 C280 260 320 290 360 360 L360 400 L40 400 Z" fill="url(#shirt)"/>
+    <path d="M120 280 L200 265 L280 280 L260 360 L140 360 Z" fill="#1a2028"/>
+
+    <!-- Pistola (Glock) + mãos -->
+    <g transform="translate(118 228)">
+      <ellipse cx="82" cy="118" rx="34" ry="28" fill="url(#skin)" opacity="0.95"/>
+      <ellipse cx="148" cy="118" rx="34" ry="28" fill="url(#skin)" opacity="0.95"/>
+      <rect x="58" y="92" width="114" height="24" rx="5" fill="url(#metal)"/>
+      <rect x="168" y="88" width="48" height="32" rx="7" fill="url(#metal)"/>
+      <path d="M72 116 C72 116 88 168 92 196 L108 196 L115 116 Z" fill="url(#skin)"/>
+      <rect x="98" y="116" width="72" height="56" rx="10" fill="url(#skin)"/>
+      <rect x="158" y="124" width="24" height="40" rx="4" fill="#7a5238"/>
+      <rect x="118" y="96" width="12" height="16" rx="2" fill="#111318"/>
+      <circle cx="188" cy="102" r="5" fill="#d4a574"/>
+      <rect x="212" y="98" width="8" height="14" rx="2" fill="#3a3f46"/>
+    </g>
+
+    <!-- Pescoço -->
+    <rect x="176" y="198" width="48" height="42" rx="12" fill="url(#skin)"/>
+
+    <!-- Rosto -->
+    <ellipse cx="200" cy="148" rx="72" ry="82" fill="url(#skin)"/>
+    <path d="M128 148 C128 118 160 88 200 88 C240 88 272 118 272 148 C272 176 252 196 200 196 C148 196 128 176 128 148 Z" fill="url(#skin)"/>
+
+    <!-- Cabelo -->
+    <path d="M132 118 C150 78 250 78 268 118 C268 96 240 72 200 72 C160 72 132 96 132 118 Z" fill="#1a1410"/>
+    <path d="M128 132 C118 112 124 92 140 84 C132 104 130 122 128 132 Z" fill="#1a1410"/>
+    <path d="M272 132 C282 112 276 92 260 84 C268 104 270 122 272 132 Z" fill="#1a1410"/>
+
+    <!-- Olhos -->
+    <ellipse cx="172" cy="142" rx="10" ry="7" fill="#fff"/>
+    <ellipse cx="228" cy="142" rx="10" ry="7" fill="#fff"/>
+    <circle cx="174" cy="143" r="4" fill="#2a2018"/>
+    <circle cx="226" cy="143" r="4" fill="#2a2018"/>
+
+    <!-- Sobrancelhas -->
+    <path d="M156 124 Q172 118 188 124" stroke="#2a2018" stroke-width="3" stroke-linecap="round"/>
+    <path d="M212 124 Q228 118 244 124" stroke="#2a2018" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Nariz e boca -->
+    <path d="M200 148 L200 168" stroke="#7a5238" stroke-width="3" stroke-linecap="round"/>
+    <path d="M186 182 Q200 190 214 182" stroke="#6b4428" stroke-width="3" stroke-linecap="round" fill="none"/>
+
+    <!-- Queixo / barba por fazer -->
+    <path d="M168 188 Q200 206 232 188" stroke="#6b4428" stroke-width="2" opacity="0.35" fill="none"/>
+
+    <!-- Luz suave no rosto -->
+    <ellipse cx="188" cy="128" rx="28" ry="36" fill="#fff" opacity="0.06"/>
+  </g>
+</svg>

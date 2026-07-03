@@ -13,11 +13,13 @@ import { doc, setDoc, getDoc } from 'firebase/firestore'
 import { auth, db, isConfigured } from './config'
 import type { UserProfile } from '@/types'
 import { generateReferralCode } from '@/lib/utils'
+import { getDefaultProfilePhoto } from '@/lib/profileAssets'
 
 const DEMO_USER: UserProfile = {
   uid: 'demo-user',
   displayName: 'Aluno Demo',
   email: 'demo@sgtvitor.edu',
+  photoURL: getDefaultProfilePhoto(),
   plan: 'free',
   knowledgeLevel: 'iniciante',
   personalization: undefined,

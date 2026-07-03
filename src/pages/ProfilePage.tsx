@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom'
 import { SurfaceLink } from '@/components/routing/SurfaceLink'
 import { motion } from 'framer-motion'
 import {
-  User,
   Crown,
   Share2,
   Copy,
@@ -29,6 +28,7 @@ import { Badge } from '@/components/ui/Badge'
 import { UserStatusButton } from '@/components/layout/UserStatusButton'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { resolveProfilePhoto } from '@/lib/profileAssets'
 import { PLAN_PRICES } from '@/types'
 import { GOAL_OPTIONS, KNOWLEDGE_LEVEL_OPTIONS } from '@/features/onboarding/onboardingData'
 
@@ -48,8 +48,12 @@ export function ProfilePage() {
   return (
     <div className="h-[calc(100dvh-5rem)] overflow-y-auto hide-scrollbar pb-8">
       <header className="glass-strong safe-top px-4 py-6 text-center">
-        <div className="w-20 h-20 rounded-full gradient-accent mx-auto flex items-center justify-center mb-3 shadow-lg shadow-blue-500/20">
-          <User size={32} className="text-white" />
+        <div className="w-20 h-20 rounded-full mx-auto mb-3 shadow-lg shadow-blue-500/20 overflow-hidden ring-2 ring-accent/40 ring-offset-2 ring-offset-bg-primary">
+          <img
+            src={resolveProfilePhoto(user?.photoURL)}
+            alt={user?.displayName ?? 'Foto de perfil'}
+            className="w-full h-full object-cover object-[center_20%]"
+          />
         </div>
         <h1 className="text-lg font-bold">{user?.displayName ?? 'Aluno'}</h1>
         <p className="text-xs text-text-muted">{user?.email}</p>
