@@ -6,12 +6,14 @@ interface AdminGoogleLoginButtonProps {
   label?: string
   onLogin: () => Promise<{ ok: boolean; error?: string }>
   disabled?: boolean
+  standalone?: boolean
 }
 
 export function AdminGoogleLoginButton({
   label = 'Entrar com Google',
   onLogin,
   disabled = false,
+  standalone = false,
 }: AdminGoogleLoginButtonProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -28,14 +30,16 @@ export function AdminGoogleLoginButton({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-3 py-1">
-        <div className="h-px flex-1 bg-white/10" />
-        <span className="text-[10px] text-text-muted uppercase">ou</span>
-        <div className="h-px flex-1 bg-white/10" />
-      </div>
+      {!standalone && (
+        <div className="flex items-center gap-3 py-1">
+          <div className="h-px flex-1 bg-white/10" />
+          <span className="text-[10px] text-text-muted uppercase">ou</span>
+          <div className="h-px flex-1 bg-white/10" />
+        </div>
+      )}
       <Button
         type="button"
-        variant="secondary"
+        variant={standalone ? 'primary' : 'secondary'}
         className="w-full"
         disabled={disabled || loading}
         onClick={() => void handleClick()}
