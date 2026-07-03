@@ -17,6 +17,7 @@ import {
   TrendingUp,
   Settings,
   ShoppingBag,
+  Shield,
 } from 'lucide-react'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -92,6 +93,14 @@ export function ProfilePage() {
           </Badge>
           <UserStatusButton compact />
           <Badge variant="accent">{user?.knowledgeLevel ?? 'iniciante'}</Badge>
+          <Link
+            to="/admin/login"
+            className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/8 hover:bg-white/12 border border-white/10 text-text-secondary hover:text-accent transition-colors shrink-0"
+            title="Painel administrativo"
+            aria-label="Painel administrativo"
+          >
+            <Shield size={13} />
+          </Link>
         </div>
       </header>
 
