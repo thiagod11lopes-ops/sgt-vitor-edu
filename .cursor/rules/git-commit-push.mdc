@@ -1,0 +1,17 @@
+---
+description: Sempre commitar e fazer push após alterações no projeto
+alwaysApply: true
+---
+
+# Git: commit e push após atualizações
+
+Após implementar ou corrigir algo neste repositório (`sgt-vitor-edu`):
+
+1. Rode `git status` e `git diff` para revisar as mudanças.
+2. Faça **commit** com mensagem clara em português (1–2 frases, foco no porquê).
+3. Faça **push** para `origin` na branch atual (geralmente `master`).
+4. Confirme o deploy do GitHub Pages quando aplicável (`gh run list`).
+
+Não peça confirmação para commit/push — o usuário quer isso automaticamente após cada atualização.
+
+Exceções: não commitar arquivos com segredos (`.env`, credenciais). Não usar `--force` em `main`/`master`.

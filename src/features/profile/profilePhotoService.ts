@@ -5,7 +5,6 @@ import { STORAGE_PATHS } from '@/services/firebase/collections'
 import { updateUserProfile } from '@/services/firebase/auth'
 import { isDefaultProfilePhoto } from '@/lib/profileAssets'
 import {
-  LOCAL_PROFILE_PHOTO_PREFIX,
   parseLocalProfilePhotoKey,
   deleteProfilePhotoFile,
   storeProfilePhotoFile,
@@ -16,12 +15,29 @@ import {
 
 const PROFILE_PHOTO_CACHE_KEY = 'sgt-vitor-profile-photo'
 const PROFILE_PHOTO_DATA_SUFFIX = '-data'
+const STORAGE_UPLOAD_TIMEOUT_MS = 8_000
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('storage-timeout')), ms)
+    promise
+      .then((value) => {
+        clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((error) => {
+        clearTimeout(timer)
+        reject(error)
+      })
+  })
+}
 
 export function persistProfilePhotoCache(uid: string, photoURL: string, dataUrl?: string) {
-  localStorage.setItem(`${PROFILE_PHOTO_CACHE_KEY}-${uid}`, photoURL)
+  const value = dataUrl ?? photoURL
+  localStorage.setItem(`${PROFILE_PHOTO_CACHE_KEY}-${uid}`, value)
   const dataKey = `${PROFILE_PHOTO_CACHE_KEY}${PROFILE_PHOTO_DATA_SUFFIX}-${uid}`
-  if (dataUrl) {
-    localStorage.setItem(dataKey, dataUrl)
+  if (value.startsWith('data:')) {
+    localStorage.setItem(dataKey, value)
   } else if (!isLocalProfilePhotoUrl(photoURL)) {
     localStorage.removeItem(dataKey)
   }
@@ -32,7 +48,9 @@ export function loadProfilePhotoCache(uid: string): string | undefined {
   const dataUrl = localStorage.getItem(dataKey)
   if (dataUrl) return dataUrl
 
-  return localStorage.getItem(`${PROFILE_PHOTO_CACHE_KEY}-${uid}`) ?? undefined
+  const cached = localStorage.getItem(`${PROFILE_PHOTO_CACHE_KEY}-${uid}`)
+  if (cached?.startsWith('data:')) return cached
+  return cached ?? undefined
 }
 
 /** @deprecated use loadProfilePhotoCache */
@@ -93,24 +111,47 @@ async function uploadToFirebaseStorage(uid: string, file: File): Promise<string>
 
 async function saveLocalPhoto(uid: string, file: File, previousPhotoURL?: string): Promise<string> {
   const previousKey = parseLocalProfilePhotoKey(previousPhotoURL)
-  if (previousKey) await deleteProfilePhotoFile(previousKey)
+  if (previousKey) void deleteProfilePhotoFile(previousKey)
 
   const dataUrl = await compressImageForCache(file)
-  const key = await storeProfilePhotoFile(file, uid)
-  const localRef = `${LOCAL_PROFILE_PHOTO_PREFIX}${key}`
 
-  persistProfilePhotoCache(uid, localRef, dataUrl)
-
-  if (isConfigured) {
-    try {
-      if (auth) await auth.authStateReady()
-      await updateUserProfile(uid, { photoURL: dataUrl })
-    } catch {
-      // Foto permanece no localStorage deste aparelho
-    }
+  try {
+    persistProfilePhotoCache(uid, dataUrl, dataUrl)
+  } catch {
+    throw new Error('Não foi possível salvar a foto neste aparelho. Libere espaço no navegador.')
   }
 
+  void storeProfilePhotoFile(file, uid).catch(() => {
+    /* IndexedDB opcional — localStorage já tem a foto */
+  })
+
   return dataUrl
+}
+
+async function tryRemoteUpload(
+  uid: string,
+  file: File,
+  previousPhotoURL?: string,
+): Promise<string | null> {
+  if (!isConfigured || !auth || !storage) return null
+
+  try {
+    await auth.authStateReady()
+    if (auth.currentUser?.uid !== uid) return null
+
+    const remoteUrl = await withTimeout(
+      uploadToFirebaseStorage(uid, file),
+      STORAGE_UPLOAD_TIMEOUT_MS,
+    )
+
+    const previousKey = parseLocalProfilePhotoKey(previousPhotoURL)
+    if (previousKey) void deleteProfilePhotoFile(previousKey)
+    return remoteUrl
+  } catch (error) {
+    const message = error instanceof Error ? error.message : ''
+    if (message.includes('Faça login')) throw error
+    return null
+  }
 }
 
 export async function uploadProfilePhoto(
@@ -121,21 +162,8 @@ export async function uploadProfilePhoto(
   const validationError = validateProfilePhotoFile(file)
   if (validationError) throw new Error(validationError)
 
-  if (isConfigured && auth) {
-    await auth.authStateReady()
+  const localUrl = await saveLocalPhoto(uid, file, previousPhotoURL)
 
-    if (auth.currentUser?.uid) {
-      try {
-        const remoteUrl = await uploadToFirebaseStorage(uid, file)
-        const previousKey = parseLocalProfilePhotoKey(previousPhotoURL)
-        if (previousKey) await deleteProfilePhotoFile(previousKey)
-        return remoteUrl
-      } catch (error) {
-        const message = error instanceof Error ? error.message : ''
-        if (message.includes('Faça login')) throw error
-      }
-    }
-  }
-
-  return saveLocalPhoto(uid, file, previousPhotoURL)
+  const remoteUrl = await tryRemoteUpload(uid, file, previousPhotoURL)
+  return remoteUrl ?? localUrl
 }

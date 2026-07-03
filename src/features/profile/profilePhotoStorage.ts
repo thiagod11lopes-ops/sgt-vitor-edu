@@ -91,25 +91,66 @@ const CACHE_JPEG_QUALITY = 0.82
 /** Gera JPEG compacto para persistir em localStorage (sobrevive ao reload). */
 export async function compressImageForCache(file: File): Promise<string> {
   if (typeof document === 'undefined') {
-    return URL.createObjectURL(file)
+    throw new Error('Ambiente sem suporte a imagem.')
   }
 
+  try {
+    return await compressWithBitmap(file)
+  } catch {
+    return compressWithImageElement(file)
+  }
+}
+
+async function compressWithBitmap(file: File): Promise<string> {
   const bitmap = await createImageBitmap(file)
-  const scale = Math.min(1, CACHE_MAX_EDGE / Math.max(bitmap.width, bitmap.height))
-  const width = Math.max(1, Math.round(bitmap.width * scale))
-  const height = Math.max(1, Math.round(bitmap.height * scale))
+  try {
+    return await drawAndEncode(bitmap.width, bitmap.height, (ctx, w, h) => {
+      ctx.drawImage(bitmap, 0, 0, w, h)
+    })
+  } finally {
+    bitmap.close()
+  }
+}
+
+function compressWithImageElement(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      drawAndEncode(img.naturalWidth, img.naturalHeight, (ctx, w, h) => {
+        ctx.drawImage(img, 0, 0, w, h)
+      })
+        .then(resolve)
+        .catch(reject)
+    }
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Não foi possível processar a imagem.'))
+    }
+
+    img.src = url
+  })
+}
+
+async function drawAndEncode(
+  sourceWidth: number,
+  sourceHeight: number,
+  paint: (ctx: CanvasRenderingContext2D, targetW: number, targetH: number) => void,
+): Promise<string> {
+  const scale = Math.min(1, CACHE_MAX_EDGE / Math.max(sourceWidth, sourceHeight))
+  const w = Math.max(1, Math.round(sourceWidth * scale))
+  const h = Math.max(1, Math.round(sourceHeight * scale))
 
   const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
+  canvas.width = w
+  canvas.height = h
   const ctx = canvas.getContext('2d')
-  if (!ctx) {
-    bitmap.close()
-    throw new Error('Não foi possível processar a imagem.')
-  }
+  if (!ctx) throw new Error('Não foi possível processar a imagem.')
 
-  ctx.drawImage(bitmap, 0, 0, width, height)
-  bitmap.close()
+  paint(ctx, w, h)
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(

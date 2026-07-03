@@ -68,8 +68,15 @@ export function ProfilePage() {
             }
             setPhotoError('')
             setPhotoUploading(true)
+            const uploadTask = updateProfilePhoto(file)
+            const timeout = new Promise<never>((_, reject) => {
+              window.setTimeout(
+                () => reject(new Error('O envio demorou demais. Tente uma imagem menor ou verifique a conexão.')),
+                25_000,
+              )
+            })
             try {
-              await updateProfilePhoto(file)
+              await Promise.race([uploadTask, timeout])
             } catch (error) {
               setPhotoError(error instanceof Error ? error.message : 'Não foi possível salvar a foto.')
             } finally {
