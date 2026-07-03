@@ -1,6 +1,6 @@
-import { doc, getDoc, setDoc, onSnapshot, collection, getDocs, writeBatch } from 'firebase/firestore'
+import { doc, getDoc, setDoc, onSnapshot, collection, getDocs, writeBatch, type Firestore } from 'firebase/firestore'
 import { COLLECTIONS, LOCAL_STORAGE_KEYS } from './collections'
-import { db, adminDb, isConfigured, seedCollection, subscribeCollection } from './firestoreHelpers'
+import { db, isConfigured, seedCollection, subscribeCollection } from './firestoreHelpers'
 import { VIDEOS as DEFAULT_VIDEOS } from '@/features/videos/videoData'
 import { DOCUMENTS as DEFAULT_DOCUMENTS } from '@/features/library/libraryData'
 import { STORE_PRODUCTS } from '@/features/store/storeData'
@@ -9,19 +9,19 @@ import type { StoreProduct, StoreOrder } from '@/features/store/storeTypes'
 
 let initialized = false
 
+export async function seedFirestoreContent(firestore: Firestore) {
+  await Promise.all([
+    seedCollection(firestore, COLLECTIONS.videos, DEFAULT_VIDEOS, LOCAL_STORAGE_KEYS.videos),
+    seedCollection(firestore, COLLECTIONS.documents, DEFAULT_DOCUMENTS, LOCAL_STORAGE_KEYS.documents),
+    seedCollection(firestore, COLLECTIONS.storeProducts, STORE_PRODUCTS, LOCAL_STORAGE_KEYS.storeProducts),
+  ])
+}
+
 export async function initFirestoreData() {
-  if (!isConfigured || !db || !adminDb || initialized) return
+  if (!isConfigured || !db || initialized) return
   initialized = true
 
-  await Promise.all([
-    seedCollection(db, COLLECTIONS.videos, DEFAULT_VIDEOS, LOCAL_STORAGE_KEYS.videos),
-    seedCollection(db, COLLECTIONS.documents, DEFAULT_DOCUMENTS, LOCAL_STORAGE_KEYS.documents),
-    seedCollection(db, COLLECTIONS.storeProducts, STORE_PRODUCTS, LOCAL_STORAGE_KEYS.storeProducts),
-    migrateOrders(),
-    migrateConsulting(),
-    migrateRegistry(),
-    migrateAnalytics(),
-  ])
+  await Promise.all([migrateOrders(), migrateConsulting(), migrateRegistry(), migrateAnalytics()])
 }
 
 async function migrateOrders() {
@@ -104,8 +104,12 @@ export function subscribeVideos(onData: (videos: Video[]) => void) {
     COLLECTIONS.videos,
     DEFAULT_VIDEOS,
     (data, id) => ({ ...data, id } as Video),
-    onData,
+    (items) => onData(sortVideos(items)),
   )
+}
+
+function sortVideos(videos: Video[]): Video[] {
+  return [...videos].sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'))
 }
 
 export function subscribeDocuments(onData: (docs: Document[]) => void) {

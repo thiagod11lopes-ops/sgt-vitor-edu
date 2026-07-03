@@ -20,7 +20,7 @@ export function VideosPage() {
   const [playlist, setPlaylist] = useState<Playlist>('all')
   const [activePlayer, setActivePlayer] = useState<ActivePlayer | null>(null)
   const { isPremium, isPremiumPlus } = useSubscription()
-  const videos = useVideos()
+  const { videos, loading } = useVideos()
 
   const filtered = videos.filter(
     (v) => playlist === 'all' || v.playlist === playlist
@@ -114,6 +114,16 @@ export function VideosPage() {
       )}
 
       <div className="px-4 py-3 space-y-4">
+        {loading && (
+          <p className="text-xs text-text-muted text-center py-8">Carregando vídeos…</p>
+        )}
+
+        {!loading && filtered.length === 0 && (
+          <p className="text-xs text-text-muted text-center py-8">
+            Nenhum vídeo disponível nesta categoria.
+          </p>
+        )}
+
         {filtered.map((video, i) => {
           const locked = video.isPremium && !isPremium && !isPremiumPlus
           const canPlay = !locked && !!getVideoEmbedUrl(video)

@@ -44,13 +44,38 @@ export async function seedCollection<T extends { id: string }>(
 export function subscribeCollection<T>(
   firestore: Firestore,
   name: string,
-  _defaults: T[],
+  fallback: T[],
   mapDoc: (data: DocumentData, id: string) => T,
   onData: (items: T[]) => void,
 ) {
-  return onSnapshot(collection(firestore, name), (snap) => {
-    onData(snap.docs.map((d) => mapDoc(d.data(), d.id)))
-  })
+  let lastItems: T[] = []
+
+  return onSnapshot(
+    collection(firestore, name),
+    { includeMetadataChanges: true },
+    (snap) => {
+      const items = snap.docs.map((d) => mapDoc(d.data(), d.id))
+
+      if (items.length > 0) {
+        lastItems = items
+        onData(items)
+        return
+      }
+
+      // Evita limpar a lista enquanto o Firestore ainda carrega (comum em mobile)
+      if (snap.metadata.fromCache) {
+        onData(lastItems.length > 0 ? lastItems : fallback)
+        return
+      }
+
+      lastItems = []
+      onData([])
+    },
+    (error) => {
+      console.error(`Firestore subscription failed (${name}):`, error)
+      onData(lastItems.length > 0 ? lastItems : fallback)
+    },
+  )
 }
 
 function withoutUndefined(data: DocumentData): DocumentData {

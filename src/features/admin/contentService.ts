@@ -14,25 +14,46 @@ export const CONTENT_UPDATED_EVENT = 'sgt-content-updated'
 let videosCache: Video[] = DEFAULT_VIDEOS
 let documentsCache: Document[] = DEFAULT_DOCUMENTS
 let subscriptionsStarted = false
+let initPromise: Promise<void> | null = null
+let videosReady = !isConfigured
 
 function notifyUpdate() {
   window.dispatchEvent(new Event(CONTENT_UPDATED_EVENT))
 }
 
-function ensureSubscriptions() {
-  if (subscriptionsStarted) return
+function startFirestoreSubscriptions() {
+  if (subscriptionsStarted) return initPromise ?? Promise.resolve()
   subscriptionsStarted = true
-  if (!isConfigured) return
+  if (!isConfigured) {
+    videosReady = true
+    return Promise.resolve()
+  }
 
-  void initFirestoreData()
-  subscribeVideos((items) => {
-    videosCache = items
-    notifyUpdate()
+  initPromise = initFirestoreData().then(() => {
+    subscribeVideos((items) => {
+      videosCache = items
+      videosReady = true
+      notifyUpdate()
+    })
+    subscribeDocuments((items) => {
+      documentsCache = items
+      notifyUpdate()
+    })
   })
-  subscribeDocuments((items) => {
-    documentsCache = items
-    notifyUpdate()
-  })
+
+  return initPromise
+}
+
+function ensureSubscriptions() {
+  void startFirestoreSubscriptions()
+}
+
+export function isVideosLoading(): boolean {
+  return isConfigured && !videosReady
+}
+
+export function waitForVideosReady(): Promise<void> {
+  return startFirestoreSubscriptions() ?? Promise.resolve()
 }
 
 export function parseYoutubeId(input: string): string | null {

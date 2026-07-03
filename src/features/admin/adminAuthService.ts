@@ -5,14 +5,23 @@ import {
   signOutAdminFirebase,
 } from '@/services/firebase/adminFirebaseAuth'
 import { isConfigured } from '@/services/firebase/config'
+import { adminDb } from '@/services/firebase/adminApp'
+import { seedFirestoreContent } from '@/services/firebase/firestoreInit'
 
 const ADMIN_SESSION_KEY = 'sgt-vitor-admin-session'
 const ADMIN_FIREBASE_WARN_KEY = 'sgt-vitor-admin-firebase-warn'
 
-function completeLogin(result: { firebaseOk: boolean; errorCode?: string }) {
+async function completeLogin(result: { firebaseOk: boolean; errorCode?: string }) {
   localStorage.setItem(ADMIN_SESSION_KEY, '1')
   if (result.firebaseOk) {
     localStorage.removeItem(ADMIN_FIREBASE_WARN_KEY)
+    if (adminDb) {
+      try {
+        await seedFirestoreContent(adminDb)
+      } catch {
+        /* seed opcional — não bloqueia login */
+      }
+    }
     return { ok: true as const }
   }
   const warning = adminFirebaseErrorMessage(result.errorCode) ?? undefined
